@@ -4,17 +4,11 @@ import docker
 from functools import wraps
 
 app = Flask(__name__)
-# Tarayıcı çerezlerini şifrelemek için gizli bir anahtar zorunludur!
 app.secret_key = "cloudpulse-super-gizli-devops-anahtari"
 
 # 🔒 GİRİŞ BİLGİLERİMİZ
 ADMIN_USER = "admin"
 ADMIN_PASS = "devops123"
-
-try:
-    docker_client = docker.from_env()
-except Exception as e:
-    docker_client = None
 
 # --- GÜVENLİK KALKANI (DECORATOR) ---
 def login_required(f):
@@ -42,7 +36,7 @@ def logout():
     session.pop('logged_in', None)
     return redirect(url_for('login'))
 
-# --- KORUMALI SAYFALAR (@login_required eklendi) ---
+# --- KORUMALI SAYFALAR ---
 @app.route('/')
 @login_required
 def index():
@@ -67,11 +61,11 @@ def get_stats():
 @app.route('/api/containers')
 @login_required
 def get_containers():
-    if not docker_client:
-        return jsonify({"error": "Docker motoruna ulaşılamadı", "containers": []})
     try:
+        # Artık her istekte canlı ve taze bağlantı kuruyoruz!
+        client = docker.from_env()
         containers = []
-        for container in docker_client.containers.list(all=True):
+        for container in client.containers.list(all=True):
             containers.append({
                 "id": container.short_id,
                 "name": container.name,
@@ -80,7 +74,8 @@ def get_containers():
             })
         return jsonify({"containers": containers})
     except Exception as e:
-        return jsonify({"error": str(e), "containers": []})
+        # Gerçek hatayı doğrudan ekrana basıyoruz ki ne olduğunu nokta atışı görelim!
+        return jsonify({"error": f"Gerçek Docker Hatası: {str(e)}", "containers": []})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
