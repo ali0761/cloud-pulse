@@ -1,59 +1,76 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 import psutil
 import docker
+from functools import wraps
 
 app = Flask(__name__)
+# Tarayıcı çerezlerini şifrelemek için gizli bir anahtar zorunludur!
+app.secret_key = "cloudpulse-super-gizli-devops-anahtari"
 
-# Docker istemcisini güvenli başlat (Windows'ta Docker yoksa veya kapalıysa uygulama çökmesin diye)
+# 🔒 GİRİŞ BİLGİLERİMİZ
+ADMIN_USER = "admin"
+ADMIN_PASS = "devops123"
+
 try:
     docker_client = docker.from_env()
 except Exception as e:
     docker_client = None
-    print("Uyarı: Docker istemcisine bağlanılamadı. (Yerel Windows testinde normaldir)")
 
+# --- GÜVENLİK KALKANI (DECORATOR) ---
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- GİRİŞ VE ÇIKIŞ ROTASI ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        if request.form['username'] == ADMIN_USER and request.form['password'] == ADMIN_PASS:
+            session['logged_in'] = True
+            return redirect(url_for('index'))
+        else:
+            error = 'Hatalı Kullanıcı Adı veya Şifre! Lütfen tekrar deneyin.'
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
+# --- KORUMALI SAYFALAR (@login_required eklendi) ---
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
 @app.route('/api/stats')
+@login_required
 def get_stats():
-    """Anlık CPU, RAM ve Disk kullanım verilerini JSON olarak döndürür."""
-    # CPU Kullanımı (%)
     cpu_percent = psutil.cpu_percent(interval=0.5)
-    
-    # RAM Kullanımı (GB ve % olarak)
     memory = psutil.virtual_memory()
     mem_total_gb = round(memory.total / (1024**3), 2)
     mem_used_gb = round(memory.used / (1024**3), 2)
     mem_percent = memory.percent
-    
-    # Disk Kullanımı (%)
     disk = psutil.disk_usage('/')
-    disk_percent = disk.percent
     
     return jsonify({
-        "cpu": {
-            "percent": cpu_percent
-        },
-        "memory": {
-            "total_gb": mem_total_gb,
-            "used_gb": mem_used_gb,
-            "percent": mem_percent
-        },
-        "disk": {
-            "percent": disk_percent
-        }
+        "cpu": {"percent": cpu_percent},
+        "memory": {"total_gb": mem_total_gb, "used_gb": mem_used_gb, "percent": mem_percent},
+        "disk": {"percent": disk.percent}
     })
 
 @app.route('/api/containers')
+@login_required
 def get_containers():
-    """Sunucudaki Docker konteynerlerini ve durumlarını listeler."""
     if not docker_client:
         return jsonify({"error": "Docker motoruna ulaşılamadı", "containers": []})
-    
     try:
         containers = []
-        # all=True parametresi hem çalışan hem de duran tüm konteynerleri getirir
         for container in docker_client.containers.list(all=True):
             containers.append({
                 "id": container.short_id,
@@ -66,5 +83,4 @@ def get_containers():
         return jsonify({"error": str(e), "containers": []})
 
 if __name__ == '__main__':
-    # 0.0.0.0 yapıyoruz ki ileride Docker içinden ve buluttan dış dünyaya açılabilsin
     app.run(host='0.0.0.0', port=5000, debug=True)
