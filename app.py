@@ -407,7 +407,12 @@ def limit_container(container_id):
         if not mem_mb: return jsonify({"status": "error", "message": "Geçersiz limit."}), 400
         client = docker.from_env()
         container = client.containers.get(container_id)
-        container.update(mem_limit=f"{mem_mb}m")
+        
+        # Docker'da bellek (RAM) limitini düşürürken, takas (swap) bellek limitiyle çakışma olabilir.
+        # Bu yüzden ikisini de aynı değere eşitliyoruz.
+        mem_str = f"{mem_mb}m"
+        container.update(mem_limit=mem_str, memswap_limit=mem_str)
+        
         return jsonify({"status": "success", "message": f"{container.name} için limit {mem_mb} MB olarak güncellendi."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
