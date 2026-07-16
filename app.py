@@ -173,6 +173,20 @@ def test_telegram():
     else:
         return jsonify({"status": "error", "message": "Telegram bildirimi gönderilemedi! Token veya Chat ID'nizi kontrol edin."}), 500
 
+# 📄 YENİ: KONTEYNER LOGLARI API'Sİ
+@app.route('/api/containers/<container_id>/logs', methods=['GET'])
+@login_required
+def get_container_logs(container_id):
+    try:
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        # Son 200 satırı al
+        logs = container.logs(tail=200, stdout=True, stderr=True)
+        logs_str = logs.decode('utf-8', errors='replace')
+        return jsonify({"status": "success", "logs": logs_str})
+    except Exception as e:
+        return jsonify({"status": "error", "logs": f"Sistem Hatası: {str(e)}"}), 500
+
 
 # 🖥️ YENİ: KONTEYNER İÇİ WEB TERMİNAL API'Sİ
 @app.route('/api/containers/<container_id>/exec', methods=['POST'])

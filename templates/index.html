@@ -7,17 +7,32 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #0f172a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-color: #f8fafc;
+            --nav-bg: #1e293b;
+        }
+        [data-bs-theme="light"] {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-color: #0f172a;
+            --nav-bg: #ffffff;
+        }
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: all 0.3s ease; }
+        .card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: all 0.3s ease; }
         .stat-value { font-size: 2rem; font-weight: 700; color: #38bdf8; }
-        .table { --bs-table-bg: transparent; --bs-table-color: #f8fafc; }
-        .table border-color { border-color: #334155; }
+        .table { --bs-table-bg: transparent; --bs-table-color: var(--text-color); }
+        .table border-color { border-color: var(--border-color); }
         .badge-running { background-color: #10b981; color: #fff; }
         .badge-exited { background-color: #ef4444; color: #fff; }
-        .navbar { background-color: #1e293b !important; border-bottom: 1px solid #334155; }
+        .navbar { background-color: var(--nav-bg) !important; border-bottom: 1px solid var(--border-color); transition: all 0.3s ease; }
+        [data-bs-theme="light"] .navbar-brand, [data-bs-theme="light"] .navbar-brand small { color: #0f172a !important; }
         .terminal-box { background-color: #050505; color: #22c55e; font-family: 'Courier New', Courier, monospace; padding: 15px; border-radius: 8px; min-height: 250px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #166534; font-size: 0.9rem; }
-        .terminal-input { background-color: #0f172a; color: #fff; border: 1px solid #334155; font-family: 'Courier New', Courier, monospace; }
-        .terminal-input:focus { background-color: #0f172a; color: #22c55e; border-color: #22c55e; box-shadow: none; }
+        .terminal-input { background-color: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); font-family: 'Courier New', Courier, monospace; }
+        .terminal-input:focus { background-color: var(--bg-color); color: #22c55e; border-color: #22c55e; box-shadow: none; }
     </style>
 </head>
 <body class="p-4">
@@ -29,6 +44,11 @@
             <div class="d-flex align-items-center">
                 <span class="badge bg-success me-3">🟢 Canlı Bağlantı</span>
                 
+                <!-- 🌙 YENİ: Tema Değiştirme Butonu -->
+                <button onclick="toggleTheme()" class="btn btn-sm btn-outline-warning fw-bold me-3" id="themeBtn">
+                    ☀️ Gündüz
+                </button>
+
                 <!-- ⚡ YENİ: Ana Sistem Terminali Butonu -->
                 <button onclick="openMainTerminal()" class="btn btn-sm btn-outline-success font-monospace fw-bold me-3">
                     💻 Canlı Terminal
@@ -131,6 +151,25 @@
         </div>
     </div>
 
+    <!-- 📄 LOG GÖRÜNTÜLEME MODAL PENCERESİ -->
+    <div class="modal fade" id="logsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title font-monospace fw-bold" id="logsTitle">📄 Servis Logları</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="terminal-box mb-0" id="logsOutput" style="font-size: 0.85rem; color: #e2e8f0; border-color: #475569;">Yükleniyor...</div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-info" onclick="refreshLogs()">🔄 Yenile</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const ctx = document.getElementById('sysChart').getContext('2d');
@@ -148,6 +187,35 @@
 
         let currentContainerId = null;
         let mainContainerId = null; // Ana monitor konteynerimizin ID'sini hafızada tutar!
+        let currentLogsContainerId = null; // Log görüntüleme için ID
+
+        // --- TEMA GEÇİŞ MANTIĞI ---
+        function toggleTheme() {
+            const htmlTag = document.documentElement;
+            const themeBtn = document.getElementById('themeBtn');
+            if (htmlTag.getAttribute('data-bs-theme') === 'dark') {
+                htmlTag.setAttribute('data-bs-theme', 'light');
+                themeBtn.innerHTML = '🌙 Gece';
+                themeBtn.className = 'btn btn-sm btn-outline-dark fw-bold me-3';
+                localStorage.setItem('cloudpulse-theme', 'light');
+            } else {
+                htmlTag.setAttribute('data-bs-theme', 'dark');
+                themeBtn.innerHTML = '☀️ Gündüz';
+                themeBtn.className = 'btn btn-sm btn-outline-warning fw-bold me-3';
+                localStorage.setItem('cloudpulse-theme', 'dark');
+            }
+        }
+        
+        // Sayfa yüklendiğinde eski temayı hatırla
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('cloudpulse-theme');
+            if (savedTheme === 'light') {
+                document.documentElement.setAttribute('data-bs-theme', 'light');
+                const themeBtn = document.getElementById('themeBtn');
+                themeBtn.innerHTML = '🌙 Gece';
+                themeBtn.className = 'btn btn-sm btn-outline-dark fw-bold me-3';
+            }
+        });
 
         function openTerminal(id, name) {
             currentContainerId = id;
@@ -157,13 +225,40 @@
             setTimeout(() => document.getElementById('cmdInput').focus(), 500);
         }
 
-        // ⚡ YENİ: Üst menüden direkt ana sisteme bağlanma fonksiyonu
+        // ⚡ YENİ: Ana sistem Terminali Butonu
         function openMainTerminal() {
             if (mainContainerId) {
                 openTerminal(mainContainerId, 'devops-monitor (Ana Sistem)');
             } else {
                 showAlert("Ana sistem ID'si henüz yüklenmedi, lütfen 2 saniye bekleyin.", "warning");
             }
+        }
+
+        // 📄 YENİ: Logları Gösterme Fonksiyonu
+        async function openLogs(id, name) {
+            currentLogsContainerId = id;
+            document.getElementById('logsTitle').innerText = `📄 Loglar | ${name}`;
+            document.getElementById('logsOutput').innerText = 'Yükleniyor...';
+            new bootstrap.Modal(document.getElementById('logsModal')).show();
+            await refreshLogs();
+        }
+
+        async function refreshLogs() {
+            if (!currentLogsContainerId) return;
+            const outBox = document.getElementById('logsOutput');
+            outBox.innerText = 'Güncelleniyor...';
+            try {
+                const res = await fetch(`/api/containers/${currentLogsContainerId}/logs`);
+                const data = await res.json();
+                if (data.status === "success") {
+                    outBox.innerText = data.logs || "(Log kaydı bulunamadı)";
+                } else {
+                    outBox.innerText = `Hata: ${data.logs}`;
+                }
+            } catch (err) {
+                outBox.innerText = `Ağ hatası veya sunucuya ulaşılamıyor.`;
+            }
+            outBox.scrollTop = outBox.scrollHeight;
         }
 
         async function executeCommand(e) {
@@ -254,7 +349,8 @@
                         mainContainerId = c.id;
                     }
 
-                    const terminalBtn = isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li><li><hr class="dropdown-divider"></li>` : '';
+                    const terminalBtn = isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li>` : '';
+                    const logsBtn = `<li><a class="dropdown-item text-secondary fw-bold" href="#" onclick="openLogs('${c.id}', '${c.name}')">📄 Logları Gör</a></li><li><hr class="dropdown-divider"></li>`;
 
                     tbody.innerHTML += `
                         <tr>
@@ -267,6 +363,7 @@
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-dark">
                                         ${terminalBtn}
+                                        ${logsBtn}
                                         <li><a class="dropdown-item text-success" href="#" onclick="manageAction('${c.id}', 'start')">▶️ Başlat</a></li>
                                         <li><a class="dropdown-item text-warning" href="#" onclick="manageAction('${c.id}', 'restart')">🔄 Yeniden Başlat</a></li>
                                         <li><a class="dropdown-item text-danger" href="#" onclick="manageAction('${c.id}', 'stop')">⏸️ Durdur</a></li>
