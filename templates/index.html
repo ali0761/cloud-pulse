@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CloudPulse | DevOps Kontrol Paneli</title>
+    <title>CloudPulse | DevOps Kontrol Paneli V4</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -33,6 +33,8 @@
         .terminal-box { background-color: #050505; color: #22c55e; font-family: 'Courier New', Courier, monospace; padding: 15px; border-radius: 8px; min-height: 250px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #166534; font-size: 0.9rem; }
         .terminal-input { background-color: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); font-family: 'Courier New', Courier, monospace; }
         .terminal-input:focus { background-color: var(--bg-color); color: #22c55e; border-color: #22c55e; box-shadow: none; }
+        .log-line { display: block; word-break: break-all; }
+        .log-highlight { background-color: #991b1b; color: white; font-weight: bold; }
     </style>
 </head>
 <body class="p-4">
@@ -40,7 +42,7 @@
     <!-- Üst Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark mb-4 rounded px-3">
         <div class="container-fluid">
-            <span class="navbar-brand fw-bold">⚡ CloudPulse <small class="text-muted fs-6">| DevOps Kontrol Paneli [v3.1 Pro]</small></span>
+            <span class="navbar-brand fw-bold">⚡ CloudPulse <small class="text-muted fs-6">| DevOps Kontrol Paneli [v4.0]</small></span>
             <div class="d-flex align-items-center">
                 <span class="badge bg-success me-3" id="roleBadge">🟢 Canlı</span>
 
@@ -53,9 +55,14 @@
                     🔔 Bildirimler
                 </button>
 
+                <!-- 📦 COMPOSE KUR BUTONU (Sadece Admin) -->
+                <button onclick="openComposeModal()" class="btn btn-sm btn-outline-light fw-bold me-3 admin-only d-none">
+                    📦 Compose Kur
+                </button>
+
                 <!-- 🚀 YENİ SERVİS KUR BUTONU (Sadece Admin) -->
                 <button onclick="openDeployModal()" class="btn btn-sm btn-outline-primary fw-bold me-3 admin-only d-none">
-                    🚀 Yeni Servis Kur
+                    🚀 Yeni Servis
                 </button>
 
                 <!-- 🧹 DİSK TEMİZLİĞİ BUTONU (Sadece Admin) -->
@@ -64,21 +71,20 @@
                 </button>
 
                 <button onclick="openMainTerminal()" class="btn btn-sm btn-outline-success font-monospace fw-bold me-3 admin-only d-none">
-                    💻 Canlı Terminal
+                    💻 Terminal
                 </button>
 
                 <button onclick="openHistoryModal()" class="btn btn-sm btn-outline-info font-monospace fw-bold me-3">
-                    📊 Geçmiş Veriler
+                    📊 Geçmiş
                 </button>
 
                 <!-- Ayarlar -->
                 <div class="dropdown me-3 admin-only d-none">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        ⚙️ Ayarlar
+                        ⚙️
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
-                        <li><h6 class="dropdown-header">Bildirim Servisleri</h6></li>
-                        <li><a class="dropdown-item text-info" href="#" onclick="testTelegram()">📱 Telegram Alarm Testi</a></li>
+                        <li><a class="dropdown-item text-info" href="#" onclick="testTelegram()">📱 Telegram Testi</a></li>
                     </ul>
                 </div>
 
@@ -113,7 +119,7 @@
         </div>
 
         <div class="row g-4 d-flex align-items-stretch">
-            <div class="col-md-7">
+            <div class="col-md-5">
                 <div class="card p-3 h-100 d-flex flex-column">
                     <h5 class="mb-3">📈 Gerçek Zamanlı Sistem Yükü</h5>
                     <div class="flex-grow-1 d-flex align-items-center">
@@ -121,23 +127,24 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-5">
+            <div class="col-md-7">
                 <div class="card p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">🐳 Docker Servisleri</h5>
                         <button class="btn btn-sm btn-outline-info" onclick="fetchContainers()">Yenile</button>
                     </div>
-                    <div class="table-responsive flex-grow-1" style="max-height: 250px; overflow-y: auto;">
-                        <table class="table table-hover align-middle">
+                    <div class="table-responsive flex-grow-1" style="max-height: 350px; overflow-y: auto;">
+                        <table class="table table-hover align-middle" style="font-size: 0.9rem;">
                             <thead>
                                 <tr>
                                     <th>İsim</th>
                                     <th>Durum</th>
+                                    <th>Kaynaklar (CPU/RAM)</th>
                                     <th>İşlem</th>
                                 </tr>
                             </thead>
                             <tbody id="container-list">
-                                <tr><td colspan="3" class="text-center text-muted">Yükleniyor...</td></tr>
+                                <tr><td colspan="4" class="text-center text-muted">Yükleniyor...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -170,16 +177,25 @@
         </div>
     </div>
 
-    <!-- 📄 LOG GÖRÜNTÜLEME MODAL -->
+    <!-- 📄 LOG GÖRÜNTÜLEME MODAL (ARAMALI) -->
     <div class="modal fade" id="logsModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title font-monospace fw-bold" id="logsTitle">📄 Servis Logları</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="modal-title font-monospace fw-bold mb-0" id="logsTitle">📄 Servis Logları</h5>
+                    
+                    <div class="d-flex align-items-center ms-auto me-3" style="width: 300px;">
+                        <input type="text" id="logSearchInput" class="form-control form-control-sm me-2" placeholder="🔍 Loglarda ara (Örn: error, exception)..." onkeyup="filterLogs()" style="background-color: var(--bg-color); color: var(--text-color);">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshLogs" checked>
+                            <label class="form-check-label text-nowrap" style="font-size: 0.8rem;">Oto Yenile</label>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn-close ms-0" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="terminal-box mb-0" id="logsOutput" style="font-size: 0.85rem; color: #e2e8f0; border-color: #475569;">Yükleniyor...</div>
+                <div class="modal-body pt-0">
+                    <div class="terminal-box mb-0 mt-3" id="logsOutput" style="font-size: 0.85rem; color: #e2e8f0; border-color: #475569;">Yükleniyor...</div>
                 </div>
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-outline-info" onclick="refreshLogs()">🔄 Yenile</button>
@@ -194,7 +210,7 @@
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title font-monospace fw-bold">📊 Son 24 Saatlik Sistem Yükü (Geçmiş)</h5>
+                    <h5 class="modal-title font-monospace fw-bold">📊 Son 24 Saatlik Sistem Yükü</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -225,9 +241,29 @@
                         <div class="mb-3">
                             <label class="form-label">Port Eşleştirme (Opsiyonel)</label>
                             <input type="text" id="deployPort" class="form-control" placeholder="Örn: 8080:80" style="background-color: var(--bg-color); color: var(--text-color);">
-                            <div class="form-text text-muted">Sol taraf dış (host) portu, sağ taraf iç porttur.</div>
                         </div>
                         <button type="submit" class="btn btn-primary w-100 fw-bold" id="deployBtnText">🚀 Kur ve Başlat</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📦 DOCKER COMPOSE MODAL -->
+    <div class="modal fade" id="composeModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold">📦 Docker Compose (Çoklu Kurulum)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="composeForm" onsubmit="deployCompose(event)">
+                        <div class="mb-3">
+                            <label class="form-label text-warning fw-bold">docker-compose.yml içeriğini aşağıya yapıştırın:</label>
+                            <textarea id="composeYaml" class="form-control font-monospace" rows="12" required style="background-color: #050505; color: #38bdf8; border: 1px solid #334155;" placeholder="version: '3'&#10;services:&#10;  web:&#10;    image: nginx:alpine&#10;    ports:&#10;      - '8080:80'"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-light w-100 fw-bold" id="composeBtnText">📦 Compose'u Ayağa Kaldır (up -d)</button>
                     </form>
                 </div>
             </div>
@@ -289,7 +325,11 @@
 
         let currentContainerId = null;
         let mainContainerId = null;
+        
         let currentLogsContainerId = null;
+        let rawLogsData = ""; // Filtreleme için saf log verisi
+        let logsInterval = null;
+
         let userRole = 'viewer';
 
         function toggleTheme() {
@@ -318,6 +358,73 @@
             }
         });
 
+        // ------------------
+        // LOGS & SEARCH LOGS
+        // ------------------
+        async function openLogs(id, name) {
+            currentLogsContainerId = id;
+            document.getElementById('logsTitle').innerText = `📄 Loglar | ${name}`;
+            document.getElementById('logSearchInput').value = '';
+            document.getElementById('logsOutput').innerHTML = 'Yükleniyor...';
+            new bootstrap.Modal(document.getElementById('logsModal')).show();
+            await refreshLogs();
+            
+            if(logsInterval) clearInterval(logsInterval);
+            logsInterval = setInterval(() => {
+                if(document.getElementById('autoRefreshLogs').checked) {
+                    refreshLogs(false);
+                }
+            }, 3000);
+        }
+
+        document.getElementById('logsModal').addEventListener('hidden.bs.modal', () => {
+            if(logsInterval) clearInterval(logsInterval);
+        });
+
+        async function refreshLogs(scrollDown = true) {
+            if (!currentLogsContainerId) return;
+            try {
+                const res = await fetch(`/api/containers/${currentLogsContainerId}/logs`);
+                const data = await res.json();
+                rawLogsData = data.logs || "(Log kaydı bulunamadı)";
+                filterLogs(scrollDown);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function filterLogs(scrollDown = true) {
+            const keyword = document.getElementById('logSearchInput').value.toLowerCase();
+            const outBox = document.getElementById('logsOutput');
+            
+            if(!keyword) {
+                outBox.innerText = rawLogsData;
+            } else {
+                const lines = rawLogsData.split('\n');
+                const filtered = lines.filter(l => l.toLowerCase().includes(keyword));
+                
+                // Vurgulama
+                const highlighted = filtered.map(l => {
+                    // Güvenli regex
+                    const regex = new RegExp(`(${keyword.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')})`, 'gi');
+                    return l.replace(regex, '<span class="log-highlight">$1</span>');
+                });
+                
+                if (highlighted.length === 0) {
+                    outBox.innerHTML = "<i class='text-muted'>Bu arama kelimesine uygun log bulunamadı.</i>";
+                } else {
+                    outBox.innerHTML = highlighted.join('<br>');
+                }
+            }
+            if(scrollDown) {
+                outBox.scrollTop = outBox.scrollHeight;
+            }
+        }
+
+
+        // ------------------
+        // TERMINAL EXEC
+        // ------------------
         function openTerminal(id, name) {
             currentContainerId = id;
             document.getElementById('terminalTitle').innerText = `💻 Canlı Terminal | ${name} (${id})`;
@@ -328,57 +435,6 @@
 
         function openMainTerminal() {
             if (mainContainerId) openTerminal(mainContainerId, 'devops-monitor (Ana Sistem)');
-        }
-
-        async function openLogs(id, name) {
-            currentLogsContainerId = id;
-            document.getElementById('logsTitle').innerText = `📄 Loglar | ${name}`;
-            document.getElementById('logsOutput').innerText = 'Yükleniyor...';
-            new bootstrap.Modal(document.getElementById('logsModal')).show();
-            await refreshLogs();
-        }
-
-        async function refreshLogs() {
-            if (!currentLogsContainerId) return;
-            const outBox = document.getElementById('logsOutput');
-            outBox.innerText = 'Güncelleniyor...';
-            try {
-                const res = await fetch(`/api/containers/${currentLogsContainerId}/logs`);
-                const data = await res.json();
-                outBox.innerText = data.logs || "(Log kaydı bulunamadı)";
-            } catch (err) {
-                outBox.innerText = `Ağ hatası!`;
-            }
-            outBox.scrollTop = outBox.scrollHeight;
-        }
-
-        let historyChartInstance = null;
-        async function openHistoryModal() {
-            new bootstrap.Modal(document.getElementById('historyModal')).show();
-            await fetchHistory();
-        }
-
-        async function fetchHistory() {
-            try {
-                const res = await fetch('/api/stats/history');
-                const data = await res.json();
-                if (data.status === "success") {
-                    if (historyChartInstance) historyChartInstance.destroy();
-                    const ctxHist = document.getElementById('historyChart').getContext('2d');
-                    const timeLabels = data.labels.map(t => t.substring(11, 16));
-                    historyChartInstance = new Chart(ctxHist, {
-                        type: 'line',
-                        data: {
-                            labels: timeLabels,
-                            datasets: [
-                                { label: 'CPU (%)', borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.2)', fill: true, data: data.cpus, tension: 0.3 },
-                                { label: 'RAM (%)', borderColor: '#818cf8', backgroundColor: 'rgba(129, 140, 248, 0.2)', fill: true, data: data.rams, tension: 0.3 }
-                            ]
-                        },
-                        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
-                    });
-                }
-            } catch (err) { console.error("Geçmiş veri çekilemedi:", err); }
         }
 
         async function executeCommand(e) {
@@ -400,6 +456,33 @@
                 outBox.innerText += `${data.output}\n\n`;
             } catch (err) { outBox.innerText += `[HATA]\n\n`; }
             outBox.scrollTop = outBox.scrollHeight;
+        }
+
+        // ------------------
+        // CORE DASHBOARD
+        // ------------------
+        let historyChartInstance = null;
+        async function openHistoryModal() {
+            new bootstrap.Modal(document.getElementById('historyModal')).show();
+            try {
+                const res = await fetch('/api/stats/history');
+                const data = await res.json();
+                if (data.status === "success") {
+                    if (historyChartInstance) historyChartInstance.destroy();
+                    const ctxHist = document.getElementById('historyChart').getContext('2d');
+                    historyChartInstance = new Chart(ctxHist, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [
+                                { label: 'CPU (%)', borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.2)', fill: true, data: data.cpus, tension: 0.3 },
+                                { label: 'RAM (%)', borderColor: '#818cf8', backgroundColor: 'rgba(129, 140, 248, 0.2)', fill: true, data: data.rams, tension: 0.3 }
+                            ]
+                        },
+                        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+                    });
+                }
+            } catch (err) {}
         }
 
         function showAlert(message, type="success") {
@@ -443,7 +526,7 @@
                 sysChart.data.datasets[0].data.push(data.cpu.percent);
                 sysChart.data.datasets[1].data.push(data.memory.percent);
                 sysChart.update();
-            } catch (e) { console.error("Metrik hatası:", e); }
+            } catch (e) {}
         }
 
         async function fetchContainers() {
@@ -454,7 +537,7 @@
                 tbody.innerHTML = '';
 
                 if (data.error) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="text-danger small">${data.error}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-danger small">${data.error}</td></tr>`;
                     return;
                 }
 
@@ -464,10 +547,10 @@
                     
                     if (c.name === 'devops-monitor') mainContainerId = c.id;
 
-                    // Admin butonları
                     const adminActions = userRole === 'admin' ? `
                         ${isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li>` : ''}
                         <li><a class="dropdown-item text-primary" href="#" onclick="setLimit('${c.id}')">⚖️ RAM Limiti Koy</a></li>
+                        <li><a class="dropdown-item text-success fw-bold" href="#" onclick="backupContainer('${c.id}')">💾 SQL Yedeği Al</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item text-success" href="#" onclick="manageAction('${c.id}', 'start')">▶️ Başlat</a></li>
                         <li><a class="dropdown-item text-warning" href="#" onclick="manageAction('${c.id}', 'restart')">🔄 Yeniden Başlat</a></li>
@@ -476,10 +559,14 @@
                         <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Sil (Kaldır)</a></li>
                     ` : '';
 
+                    // Stats string
+                    let statsStr = isUp ? `CPU: %${c.stats.cpu} | RAM: %${c.stats.ram_percent} <span class="text-muted small">(${c.stats.ram_mb} MB)</span>` : `<span class="text-muted">-</span>`;
+
                     tbody.innerHTML += `
                         <tr>
                             <td class="fw-bold small">${c.name}</td>
                             <td><span class="badge ${badgeClass}">${c.status}</span></td>
+                            <td style="font-size: 0.85rem;">${statsStr}</td>
                             <td>
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
@@ -494,7 +581,7 @@
                         </tr>
                     `;
                 });
-            } catch (e) { console.error("Docker hatası:", e); }
+            } catch (e) {}
         }
 
         async function manageAction(id, action) {
@@ -507,41 +594,63 @@
             } catch (e) { showAlert("Hata oluştu!", "danger"); }
         }
 
-        // --- YENİ EKLENEN ÖZELLİKLER ---
+        // ------------------
+        // V4 YENİ EKLENTİLER
+        // ------------------
 
-        function openDeployModal() {
-            new bootstrap.Modal(document.getElementById('deployModal')).show();
-        }
+        function openDeployModal() { new bootstrap.Modal(document.getElementById('deployModal')).show(); }
 
         async function deployContainer(e) {
             e.preventDefault();
             const btn = document.getElementById('deployBtnText');
-            btn.innerText = "Kuruluyor, Lütfen Bekleyin...";
-            btn.disabled = true;
-
+            btn.innerText = "Kuruluyor, Lütfen Bekleyin..."; btn.disabled = true;
             const payload = {
                 image: document.getElementById('deployImage').value,
                 name: document.getElementById('deployName').value,
                 port: document.getElementById('deployPort').value
             };
-
             try {
                 const res = await fetch('/api/containers/deploy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                 });
                 const data = await res.json();
                 showAlert(data.message, res.ok ? "success" : "danger");
+                if(res.ok) { document.getElementById('deployForm').reset(); bootstrap.Modal.getInstance(document.getElementById('deployModal')).hide(); fetchContainers(); }
+            } catch(e) { showAlert("Ağ hatası!", "danger"); }
+            btn.innerText = "🚀 Kur ve Başlat"; btn.disabled = false;
+        }
+
+        function openComposeModal() { new bootstrap.Modal(document.getElementById('composeModal')).show(); }
+
+        async function deployCompose(e) {
+            e.preventDefault();
+            const btn = document.getElementById('composeBtnText');
+            btn.innerText = "Yükleniyor... Biraz zaman alabilir"; btn.disabled = true;
+            try {
+                const res = await fetch('/api/containers/compose', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ yaml: document.getElementById('composeYaml').value })
+                });
+                const data = await res.json();
+                showAlert(data.message, res.ok ? "success" : "danger");
+                if(res.ok) { document.getElementById('composeForm').reset(); bootstrap.Modal.getInstance(document.getElementById('composeModal')).hide(); fetchContainers(); }
+            } catch(e) { showAlert("Ağ hatası!", "danger"); }
+            btn.innerText = "📦 Compose'u Ayağa Kaldır (up -d)"; btn.disabled = false;
+        }
+
+        async function backupContainer(id) {
+            showAlert("Yedek alınıyor, lütfen bekleyin...", "info");
+            try {
+                const res = await fetch(`/api/containers/${id}/backup`, { method: 'POST' });
+                const data = await res.json();
                 if(res.ok) {
-                    document.getElementById('deployForm').reset();
-                    bootstrap.Modal.getInstance(document.getElementById('deployModal')).hide();
-                    fetchContainers();
+                    showAlert(data.message, "success");
+                    // Otomatik indir
+                    window.location.href = data.download_url;
+                } else {
+                    showAlert(data.message, "danger");
                 }
             } catch(e) { showAlert("Ağ hatası!", "danger"); }
-            
-            btn.innerText = "🚀 Kur ve Başlat";
-            btn.disabled = false;
         }
 
         async function openAlertsModal() {
@@ -553,13 +662,10 @@
                 const data = await res.json();
                 if(data.status === 'success') {
                     ul.innerHTML = '';
-                    if(data.alerts.length === 0) {
-                        ul.innerHTML = '<li class="list-group-item text-center">Hiç alarm kaydı yok.</li>';
-                    }
+                    if(data.alerts.length === 0) ul.innerHTML = '<li class="list-group-item text-center">Hiç alarm kaydı yok.</li>';
                     data.alerts.forEach(a => {
                         ul.innerHTML += `<li class="list-group-item" style="background-color: var(--bg-color); color: var(--text-color);">
-                            <small class="text-danger fw-bold">[${a.time}]</small><br>
-                            <span style="white-space: pre-wrap;">${a.message}</span>
+                            <small class="text-danger fw-bold">[${a.time}]</small><br><span style="white-space: pre-wrap;">${a.message}</span>
                         </li>`;
                     });
                 }
@@ -576,8 +682,7 @@
                 ul.innerHTML = '';
                 data.images.forEach(img => {
                     ul.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center" style="background-color: var(--bg-color); color: var(--text-color);">
-                        <span class="font-monospace">${img.tag}</span>
-                        <span class="badge bg-secondary rounded-pill">${img.size_mb} MB</span>
+                        <span class="font-monospace">${img.tag}</span><span class="badge bg-secondary rounded-pill">${img.size_mb} MB</span>
                     </li>`;
                 });
             } catch(e) {}
@@ -590,26 +695,33 @@
                 const res = await fetch('/api/system/prune', { method: 'POST' });
                 const data = await res.json();
                 showAlert(data.message, res.ok ? "success" : "danger");
-                openImagesModal(); // Yenile
+                openImagesModal();
             } catch(e) {}
         }
 
         async function setLimit(id) {
-            const limit = prompt("Bu servis için MB cinsinden RAM limiti girin (Örn: 512):");
+            const limit = prompt("MB cinsinden RAM limiti girin (Örn: 512):");
             if(!limit) return;
             try {
                 const res = await fetch(`/api/containers/${id}/limit`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mem_limit_mb: limit })
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mem_limit_mb: limit })
                 });
                 const data = await res.json();
                 showAlert(data.message, res.ok ? "success" : "danger");
             } catch(e) {}
         }
 
+        async function testTelegram() {
+            try {
+                showAlert("Telegram'a test gönderiliyor...", "info");
+                const res = await fetch('/api/test-telegram', { method: 'POST' });
+                const data = await res.json();
+                showAlert(data.message, res.ok ? "success" : "danger");
+            } catch (e) { showAlert("Ağ hatası oluştu!", "danger"); }
+        }
+
         setInterval(fetchStats, 2000);
-        setInterval(fetchContainers, 5000);
+        setInterval(fetchContainers, 3000);
         fetchStats();
         fetchContainers();
     </script>

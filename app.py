@@ -1,7 +1,9 @@
 import os
 import time
+import uuid
+import subprocess
 import requests as req_lib
-from flask import Flask, jsonify, render_template, request, redirect, url_for, session
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session, send_file
 import psutil
 import docker
 import sqlite3
@@ -12,16 +14,20 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "cloudpulse-super-gizli-2026-devops-key")
 
-# 🚨 TELEGRAM AYARLARIMIZ (Burayı kendi bilgilerinle doldur!)
+# 🚨 TELEGRAM AYARLARIMIZ
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8505924463:AAFJsvvg3v8CgI6kNZuZsxN5bkbn7rOG6xA")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "985168129")
 
-# 🔒 GÜÇLÜ GİRİŞ BİLGİLERİMİZ (Admin ve Viewer)
+# 🔒 GÜÇLÜ GİRİŞ BİLGİLERİMİZ
 ADMIN_USER = os.environ.get("ADMIN_USER", "sysadmin")
 ADMIN_PASS_HASH = generate_password_hash(os.environ.get("ADMIN_PASS", "CloudPulse.2026!Secure#"))
 
 VIEWER_USER = os.environ.get("VIEWER_USER", "guest")
 VIEWER_PASS_HASH = generate_password_hash(os.environ.get("VIEWER_PASS", "Guest123"))
+
+# --- YEDEKLEME (BACKUP) KLASÖRÜ ---
+BACKUP_DIR = os.path.join(os.getcwd(), "backups")
+os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # --- VERİTABANI VE GEÇMİŞ İZLEME ---
 DB_NAME = 'cloudpulse.db'
@@ -53,19 +59,50 @@ def background_db_worker():
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             c.execute("INSERT INTO stats_history (cpu, ram) VALUES (?, ?)", (cpu_percent, mem_percent))
-            # 7 Günden eski verileri sil
             c.execute("DELETE FROM stats_history WHERE timestamp <= datetime('now', '-7 days')")
-            # En fazla 1000 alarm kalsın
             c.execute("DELETE FROM alerts_history WHERE id NOT IN (SELECT id FROM alerts_history ORDER BY id DESC LIMIT 1000)")
             conn.commit()
             conn.close()
         except Exception as e:
             print("DB Worker Hatası:", e)
-        time.sleep(300) # 5 Dakika bekle
+        time.sleep(300)
 
-# Veritabanını kur ve arkaplan işçisini başlat
+# --- KONTEYNER ANLIK METRİK İŞÇİSİ (V4) ---
+container_stats_cache = {}
+
+def background_container_stats_worker():
+    while True:
+        try:
+            client = docker.from_env()
+            for container in client.containers.list():
+                if container.status.lower() in ["running", "up"]:
+                    stats = container.stats(stream=False)
+                    # CPU Hesaplama (Docker API standardı)
+                    cpu_delta = stats['cpu_stats']['cpu_usage']['total_usage'] - stats['precpu_stats']['cpu_usage']['total_usage']
+                    system_cpu_delta = stats['cpu_stats']['system_cpu_usage'] - stats['precpu_stats'].get('system_cpu_usage', 0)
+                    number_cpus = stats['cpu_stats'].get('online_cpus', 1)
+                    cpu_percent = 0.0
+                    if system_cpu_delta > 0.0 and cpu_delta > 0.0:
+                        cpu_percent = (cpu_delta / system_cpu_delta) * number_cpus * 100.0
+                    
+                    # RAM Hesaplama
+                    mem_usage = stats['memory_stats'].get('usage', 0)
+                    mem_limit = stats['memory_stats'].get('limit', 1)
+                    mem_percent = (mem_usage / mem_limit) * 100.0 if mem_limit > 0 else 0.0
+                    mem_mb = mem_usage / (1024 * 1024)
+
+                    container_stats_cache[container.short_id] = {
+                        "cpu": round(cpu_percent, 2),
+                        "ram_percent": round(mem_percent, 2),
+                        "ram_mb": round(mem_mb, 2)
+                    }
+        except Exception as e:
+            pass # Worker sessizce çalışmalı
+        time.sleep(3) # 3 Saniyede bir güncelle
+
 init_db()
 threading.Thread(target=background_db_worker, daemon=True).start()
+threading.Thread(target=background_container_stats_worker, daemon=True).start()
 
 # --- SPAM VE BİLİNÇLİ DURDURMA KORUMASI ---
 last_alert_times = {}
@@ -80,18 +117,16 @@ def send_telegram_alert(alert_key, message, force=False):
         if now - last_alert_times[alert_key] < ALERT_COOLDOWN:
             return False
 
-    # Veritabanına kaydet
     try:
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
         c.execute("INSERT INTO alerts_history (message) VALUES (?)", (message,))
         conn.commit()
         conn.close()
-    except Exception as e:
-        print("Alert DB kayıt hatası:", e)
+    except:
+        pass
 
     if TELEGRAM_TOKEN == "BURAYA_BOTFATHER_TOKEN_GELECEK":
-        print("UYARI: Telegram Token ayarlanmamış!")
         return False
 
     try:
@@ -101,11 +136,11 @@ def send_telegram_alert(alert_key, message, force=False):
         if res.status_code == 200:
             last_alert_times[alert_key] = now
             return True
-    except Exception as e:
-        print(f"Telegram Gönderim Hatası: {e}")
+    except:
+        pass
     return False
 
-# --- GÜVENLİK KALKANI ---
+# --- GÜVENLİK ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -162,15 +197,15 @@ def get_stats():
     disk = psutil.disk_usage('/')
     
     if cpu_percent >= 80.0:
-        send_telegram_alert("high_cpu", f"🚨 *KRİTİK UYARI: Yüksek CPU!*\n\n🖥️ Sunucu işlemci yükü *%{cpu_percent}* seviyesine ulaştı! Lütfen sistemi kontrol edin.")
+        send_telegram_alert("high_cpu", f"🚨 *KRİTİK UYARI: Yüksek CPU!*\n\n🖥️ Sunucu işlemci yükü *%{cpu_percent}* seviyesine ulaştı!")
     if mem_percent >= 80.0:
-        send_telegram_alert("high_mem", f"🚨 *KRİTİK UYARI: Yüksek RAM!*\n\n💾 Sunucuda bellek kullanımı *%{mem_percent}* (*{mem_used_gb} GB*) seviyesine çıktı!")
+        send_telegram_alert("high_mem", f"🚨 *KRİTİK UYARI: Yüksek RAM!*\n\n💾 Sunucuda bellek kullanımı *%{mem_percent}* seviyesine çıktı!")
 
     return jsonify({
         "cpu": {"percent": cpu_percent},
         "memory": {"total_gb": mem_total_gb, "used_gb": mem_used_gb, "percent": mem_percent},
         "disk": {"percent": disk.percent},
-        "role": session.get('role', 'viewer') # Arayüze rol bilgisini gönder
+        "role": session.get('role', 'viewer')
     })
 
 @app.route('/api/stats/history')
@@ -183,10 +218,12 @@ def get_stats_history():
         rows = c.fetchall()
         conn.close()
         rows.reverse()
-        labels = [r[0] for r in rows]
-        cpus = [r[1] for r in rows]
-        rams = [r[2] for r in rows]
-        return jsonify({"status": "success", "labels": labels, "cpus": cpus, "rams": rams})
+        return jsonify({
+            "status": "success", 
+            "labels": [r[0] for r in rows], 
+            "cpus": [r[1] for r in rows], 
+            "rams": [r[2] for r in rows]
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -218,20 +255,20 @@ def get_containers():
                 exit_code = container.attrs.get('State', {}).get('ExitCode', 0)
                 error_msg = container.attrs.get('State', {}).get('Error', '')
                 if name not in muted_containers and (exit_code != 0 or error_msg):
-                    send_telegram_alert(
-                        f"crash_{name}", 
-                        f"🚨 *KRİTİK DOCKER ÇÖKME ALARMI!*\n\n🐳 `{name}` servisi BEKLENMEDİK ŞEKİLDE ÇÖKTÜ!\n*Hata Kodu (Exit Code):* `{exit_code}`\n*Detay:* `{error_msg or 'Bilinmeyen Sistem Hatası'}`"
-                    )
+                    send_telegram_alert(f"crash_{name}", f"🚨 *KRİTİK DOCKER ÇÖKME ALARMI!*\n\n🐳 `{name}` servisi ÇÖKTÜ!\n*Exit Code:* `{exit_code}`")
                 
+            c_stats = container_stats_cache.get(container.short_id, {"cpu": 0.0, "ram_percent": 0.0, "ram_mb": 0.0})
+            
             containers.append({
                 "id": container.short_id,
                 "name": name,
                 "status": status,
-                "image": container.image.tags[0] if container.image.tags else "bilinmiyor"
+                "image": container.image.tags[0] if container.image.tags else "bilinmiyor",
+                "stats": c_stats
             })
         return jsonify({"containers": containers})
     except Exception as e:
-        return jsonify({"error": f"Gerçek Docker Hatası: {str(e)}", "containers": []})
+        return jsonify({"error": str(e), "containers": []})
 
 @app.route('/api/containers/<container_id>/<action>', methods=['POST'])
 @login_required
@@ -242,23 +279,19 @@ def manage_container(container_id, action):
         container = client.containers.get(container_id)
         
         if container.name == "devops-monitor" and action in ["stop", "delete"]:
-            return jsonify({"status": "error", "message": "Güvenlik Engeli: Aktif izleme panelini arayüzden durduramaz veya silemezsiniz!"}), 403
+            return jsonify({"status": "error", "message": "Güvenlik Engeli!"}), 403
 
         if action == "start":
             muted_containers.discard(container.name)
             container.start()
-            send_telegram_alert(f"action_{container.name}", f"▶️ *SERVİS BAŞLATILDI*\n\n`{container.name}` servisi arayüzden aktifleştirildi.", force=True)
         elif action == "stop":
             muted_containers.add(container.name)
             container.stop()
-            send_telegram_alert(f"action_{container.name}", f"⏸️ *SERVİS DURDURULDU*\n\n`{container.name}` servisi arayüzden bilinçli durduruldu.", force=True)
         elif action == "restart":
             muted_containers.discard(container.name)
             container.restart()
-            send_telegram_alert(f"action_{container.name}", f"🔄 *SERVİS YENİDEN BAŞLATILDI*\n\n`{container.name}` servisi arayüzden yeniden başlatıldı.", force=True)
         elif action == "delete":
             container.remove(force=True)
-            send_telegram_alert(f"action_{container.name}", f"🗑️ *SERVİS SİLİNDİ*\n\n`{container.name}` servisi kaldırıldı!", force=True)
         else:
             return jsonify({"status": "error", "message": "Geçersiz işlem!"}), 400
             
@@ -276,25 +309,93 @@ def deploy_container():
         name = data.get('name', '').strip()
         port_mapping = data.get('port', '').strip()
 
-        if not image:
-            return jsonify({"status": "error", "message": "İmaj adı boş olamaz!"}), 400
+        if not image: return jsonify({"status": "error", "message": "İmaj adı boş!"}), 400
 
         client = docker.from_env()
         ports = {}
         if port_mapping:
             parts = port_mapping.split(':')
-            if len(parts) == 2:
-                ports[f"{parts[1]}/tcp"] = int(parts[0])
+            if len(parts) == 2: ports[f"{parts[1]}/tcp"] = int(parts[0])
 
         kwargs = {'detach': True}
         if name: kwargs['name'] = name
         if ports: kwargs['ports'] = ports
 
         client.containers.run(image, **kwargs)
-        send_telegram_alert("deploy", f"🚀 *YENİ SERVİS KURULDU*\n\n`{image}` imajı başarıyla başlatıldı.", force=True)
-        return jsonify({"status": "success", "message": f"{image} başarıyla kuruldu ve başlatıldı!"})
+        return jsonify({"status": "success", "message": f"{image} başarıyla başlatıldı!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/containers/compose', methods=['POST'])
+@login_required
+@admin_required
+def run_compose():
+    try:
+        data = request.get_json()
+        yaml_content = data.get('yaml', '').strip()
+        if not yaml_content:
+            return jsonify({"status": "error", "message": "YAML içeriği boş olamaz!"}), 400
+        
+        compose_dir = os.path.join(os.getcwd(), "compose_apps", str(uuid.uuid4())[:8])
+        os.makedirs(compose_dir, exist_ok=True)
+        yaml_path = os.path.join(compose_dir, "docker-compose.yml")
+        
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            f.write(yaml_content)
+        
+        result = subprocess.run(["docker", "compose", "up", "-d"], cwd=compose_dir, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            send_telegram_alert("compose", f"📦 *YENİ COMPOSE BAŞLATILDI*\n\nToplu servis kurulumu tamamlandı.", force=True)
+            return jsonify({"status": "success", "message": "Docker Compose başarıyla başlatıldı!"})
+        else:
+            # Alternatif olarak docker-compose komutunu dene (Eski sürümler)
+            res2 = subprocess.run(["docker-compose", "up", "-d"], cwd=compose_dir, capture_output=True, text=True)
+            if res2.returncode == 0:
+                return jsonify({"status": "success", "message": "Docker Compose başarıyla başlatıldı!"})
+            return jsonify({"status": "error", "message": f"Hata: {result.stderr or res2.stderr}"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/containers/<container_id>/backup', methods=['POST'])
+@login_required
+@admin_required
+def backup_container(container_id):
+    try:
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        img = (container.image.tags[0] if container.image.tags else "").lower()
+        
+        if "mysql" in img or "mariadb" in img:
+            cmd = ["bash", "-c", "mysqldump -u root -p$MYSQL_ROOT_PASSWORD --all-databases 2>/dev/null || mysqldump -u root --all-databases 2>/dev/null"]
+        elif "postgres" in img:
+            cmd = ["bash", "-c", "pg_dumpall -U postgres"]
+        else:
+            return jsonify({"status": "error", "message": "Bu imaj bilinen bir Veritabanı değil (MySQL, MariaDB, Postgres)!"}), 400
+
+        exit_code, output = container.exec_run(cmd)
+        if exit_code != 0 or len(output) < 100: # Çıktı çok kısaysa muhtemelen hata var
+            return jsonify({"status": "error", "message": "Yedek alınamadı! DB root şifreniz ayarlanmamış veya veritabanı hazır değil."}), 500
+            
+        filename = f"{container.name}_backup_{int(time.time())}.sql"
+        filepath = os.path.join(BACKUP_DIR, filename)
+        
+        with open(filepath, "wb") as f:
+            f.write(output)
+            
+        send_telegram_alert("backup", f"💾 *YEDEK ALINDI*\n\n`{container.name}` servisinin yedeği alındı.", force=True)
+        return jsonify({"status": "success", "message": "Yedek başarıyla alındı!", "download_url": f"/api/backups/download/{filename}"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/backups/download/<filename>')
+@login_required
+@admin_required
+def download_backup(filename):
+    filepath = os.path.join(BACKUP_DIR, filename)
+    if os.path.exists(filepath):
+        return send_file(filepath, as_attachment=True)
+    return "Dosya bulunamadı", 404
 
 @app.route('/api/containers/<container_id>/limit', methods=['POST'])
 @login_required
@@ -303,13 +404,10 @@ def limit_container(container_id):
     try:
         data = request.get_json()
         mem_mb = data.get('mem_limit_mb')
-        if not mem_mb:
-            return jsonify({"status": "error", "message": "Geçersiz limit değeri."}), 400
-            
+        if not mem_mb: return jsonify({"status": "error", "message": "Geçersiz limit."}), 400
         client = docker.from_env()
         container = client.containers.get(container_id)
         container.update(mem_limit=f"{mem_mb}m")
-        send_telegram_alert("limit", f"🔒 *LİMİT GÜNCELLENDİ*\n\n`{container.name}` servisine {mem_mb} MB RAM limiti koyuldu.", force=True)
         return jsonify({"status": "success", "message": f"{container.name} için limit {mem_mb} MB olarak güncellendi."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -338,7 +436,6 @@ def prune_system():
         res = client.images.prune(filters={'dangling': False})
         reclaimed = res.get('SpaceReclaimed', 0)
         reclaimed_mb = round(reclaimed / (1024*1024), 2)
-        send_telegram_alert("prune", f"🧹 *DİSK TEMİZLİĞİ YAPILDI*\n\nSunucuda kullanılmayan imajlar silindi. Boşaltılan alan: {reclaimed_mb} MB.", force=True)
         return jsonify({"status": "success", "message": f"Kullanılmayan imajlar silindi. Boşaltılan alan: {reclaimed_mb} MB."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -359,7 +456,7 @@ def get_container_logs(container_id):
     try:
         client = docker.from_env()
         container = client.containers.get(container_id)
-        logs = container.logs(tail=200, stdout=True, stderr=True)
+        logs = container.logs(tail=500, stdout=True, stderr=True)
         logs_str = logs.decode('utf-8', errors='replace')
         return jsonify({"status": "success", "logs": logs_str})
     except Exception as e:
