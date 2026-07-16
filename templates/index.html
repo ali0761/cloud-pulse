@@ -531,6 +531,11 @@
 
         async function fetchContainers() {
             try {
+                // Kullanıcı "İşlem" menüsünü açtıysa tabloyu yenilemeyi durdur ki menü kapanmasın
+                if (document.querySelector('#container-list .show')) {
+                    return;
+                }
+
                 const res = await fetch('/api/containers');
                 const data = await res.json();
                 const tbody = document.getElementById('container-list');
