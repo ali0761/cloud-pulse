@@ -15,7 +15,6 @@
         .badge-running { background-color: #10b981; color: #fff; }
         .badge-exited { background-color: #ef4444; color: #fff; }
         .navbar { background-color: #1e293b !important; border-bottom: 1px solid #334155; }
-        /* Terminal Ekranı Tasarımı */
         .terminal-box { background-color: #050505; color: #22c55e; font-family: 'Courier New', Courier, monospace; padding: 15px; border-radius: 8px; min-height: 250px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #166534; font-size: 0.9rem; }
         .terminal-input { background-color: #0f172a; color: #fff; border: 1px solid #334155; font-family: 'Courier New', Courier, monospace; }
         .terminal-input:focus { background-color: #0f172a; color: #22c55e; border-color: #22c55e; box-shadow: none; }
@@ -23,13 +22,31 @@
 </head>
 <body class="p-4">
 
-    <!-- Üst Navbar -->
+    <!-- Üst Navbar (YENİLENEN PRO TASARIM!) -->
     <nav class="navbar navbar-expand-lg navbar-dark mb-4 rounded px-3">
         <div class="container-fluid">
-            <span class="navbar-brand fw-bold">⚡ CloudPulse <small class="text-muted fs-6">| DevOps Kontrol Paneli [v3.0 Web SSH]</small></span>
+            <span class="navbar-brand fw-bold">⚡ CloudPulse <small class="text-muted fs-6">| DevOps Kontrol Paneli [v3.1 Pro]</small></span>
             <div class="d-flex align-items-center">
                 <span class="badge bg-success me-3">🟢 Canlı Bağlantı</span>
-                <button onclick="testTelegram()" class="btn btn-sm btn-outline-info fw-bold me-3">📱 Telegram Test</button>
+                
+                <!-- ⚡ YENİ: Ana Sistem Terminali Butonu -->
+                <button onclick="openMainTerminal()" class="btn btn-sm btn-outline-success font-monospace fw-bold me-3">
+                    💻 Canlı Terminal
+                </button>
+
+                <!-- ⚙️ YENİ: Ayarlar Menüsü (Test butonu buraya gizlendi!) -->
+                <div class="dropdown me-3">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        ⚙️ Ayarlar
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+                        <li><h6 class="dropdown-header">Bildirim Servisleri</h6></li>
+                        <li><a class="dropdown-item text-info" href="#" onclick="testTelegram()">📱 Telegram Alarm Testi</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><span class="dropdown-item-text text-muted small">Almanya / Frankfurt DC</span></li>
+                    </ul>
+                </div>
+
                 <a href="/logout" class="btn btn-sm btn-outline-danger fw-bold">🔒 Güvenli Çıkış</a>
             </div>
         </div>
@@ -130,15 +147,23 @@
         });
 
         let currentContainerId = null;
-        let currentContainerName = "";
+        let mainContainerId = null; // Ana monitor konteynerimizin ID'sini hafızada tutar!
 
         function openTerminal(id, name) {
             currentContainerId = id;
-            currentContainerName = name;
             document.getElementById('terminalTitle').innerText = `💻 Canlı Terminal | ${name} (${id})`;
             document.getElementById('terminalOutput').innerText = `--- [ ${name} ] servisine bağlanıldı ---\nKomutlarınızı doğrudan bu konteyner içinde çalıştırabilirsiniz.\n\n`;
             new bootstrap.Modal(document.getElementById('terminalModal')).show();
             setTimeout(() => document.getElementById('cmdInput').focus(), 500);
+        }
+
+        // ⚡ YENİ: Üst menüden direkt ana sisteme bağlanma fonksiyonu
+        function openMainTerminal() {
+            if (mainContainerId) {
+                openTerminal(mainContainerId, 'devops-monitor (Ana Sistem)');
+            } else {
+                showAlert("Ana sistem ID'si henüz yüklenmedi, lütfen 2 saniye bekleyin.", "warning");
+            }
         }
 
         async function executeCommand(e) {
@@ -224,7 +249,11 @@
                     const isUp = c.status.toLowerCase().includes('up') || c.status.toLowerCase().includes('running');
                     const badgeClass = isUp ? 'badge-running' : 'badge-exited';
                     
-                    // Sadece çalışanlarda (Up/running) terminal butonunu gösterelim!
+                    // Ana izleme panelimizin ID'sini otomatik olarak yakala ve hafızaya al!
+                    if (c.name === 'devops-monitor') {
+                        mainContainerId = c.id;
+                    }
+
                     const terminalBtn = isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li><li><hr class="dropdown-divider"></li>` : '';
 
                     tbody.innerHTML += `
