@@ -37,42 +37,52 @@
 </head>
 <body class="p-4">
 
-    <!-- Üst Navbar (YENİLENEN PRO TASARIM!) -->
+    <!-- Üst Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark mb-4 rounded px-3">
         <div class="container-fluid">
             <span class="navbar-brand fw-bold">⚡ CloudPulse <small class="text-muted fs-6">| DevOps Kontrol Paneli [v3.1 Pro]</small></span>
             <div class="d-flex align-items-center">
-                <span class="badge bg-success me-3">🟢 Canlı Bağlantı</span>
-                
-                <!-- 🌙 YENİ: Tema Değiştirme Butonu -->
+                <span class="badge bg-success me-3" id="roleBadge">🟢 Canlı</span>
+
                 <button onclick="toggleTheme()" class="btn btn-sm btn-outline-warning fw-bold me-3" id="themeBtn">
                     ☀️ Gündüz
                 </button>
 
-                <!-- ⚡ YENİ: Ana Sistem Terminali Butonu -->
-                <button onclick="openMainTerminal()" class="btn btn-sm btn-outline-success font-monospace fw-bold me-3">
+                <!-- 🔔 ALARMLAR BUTONU -->
+                <button onclick="openAlertsModal()" class="btn btn-sm btn-outline-danger fw-bold me-3 position-relative">
+                    🔔 Bildirimler
+                </button>
+
+                <!-- 🚀 YENİ SERVİS KUR BUTONU (Sadece Admin) -->
+                <button onclick="openDeployModal()" class="btn btn-sm btn-outline-primary fw-bold me-3 admin-only d-none">
+                    🚀 Yeni Servis Kur
+                </button>
+
+                <!-- 🧹 DİSK TEMİZLİĞİ BUTONU (Sadece Admin) -->
+                <button onclick="openImagesModal()" class="btn btn-sm btn-outline-secondary fw-bold me-3 admin-only d-none">
+                    🧹 İmajlar & Temizlik
+                </button>
+
+                <button onclick="openMainTerminal()" class="btn btn-sm btn-outline-success font-monospace fw-bold me-3 admin-only d-none">
                     💻 Canlı Terminal
                 </button>
 
-                <!-- 📊 YENİ: Geçmiş Veriler Butonu -->
                 <button onclick="openHistoryModal()" class="btn btn-sm btn-outline-info font-monospace fw-bold me-3">
                     📊 Geçmiş Veriler
                 </button>
 
-                <!-- ⚙️ YENİ: Ayarlar Menüsü (Test butonu buraya gizlendi!) -->
-                <div class="dropdown me-3">
+                <!-- Ayarlar -->
+                <div class="dropdown me-3 admin-only d-none">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                         ⚙️ Ayarlar
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
                         <li><h6 class="dropdown-header">Bildirim Servisleri</h6></li>
                         <li><a class="dropdown-item text-info" href="#" onclick="testTelegram()">📱 Telegram Alarm Testi</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><span class="dropdown-item-text text-muted small">Almanya / Frankfurt DC</span></li>
                     </ul>
                 </div>
 
-                <a href="/logout" class="btn btn-sm btn-outline-danger fw-bold">🔒 Güvenli Çıkış</a>
+                <a href="/logout" class="btn btn-sm btn-outline-danger fw-bold">🔒 Çıkış</a>
             </div>
         </div>
     </nav>
@@ -136,20 +146,22 @@
         </div>
     </div>
 
-    <!-- 💻 WEB TERMİNAL MODAL PENCERESİ -->
+    <!-- MODALLAR BAŞLANGIÇ -->
+    
+    <!-- 💻 WEB TERMİNAL MODAL -->
     <div class="modal fade" id="terminalModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content bg-dark border-secondary">
+            <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title text-success font-monospace" id="terminalTitle">💻 Canlı Terminal</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="terminal-box mb-3" id="terminalOutput">Bağlantı hazır. Bir komut yazıp Enter'a basın...\n</div>
                     <form id="terminalForm" onsubmit="executeCommand(event)">
                         <div class="input-group">
                             <span class="input-group-text bg-dark text-success border-secondary font-monospace">root@docker:~#</span>
-                            <input type="text" id="cmdInput" class="form-control terminal-input" placeholder="ls, whoami, ps aux, cat /etc/os-release..." autocomplete="off">
+                            <input type="text" id="cmdInput" class="form-control terminal-input" placeholder="ls, whoami..." autocomplete="off">
                             <button class="btn btn-success font-monospace" type="submit">Çalıştır ⚡</button>
                         </div>
                     </form>
@@ -158,13 +170,13 @@
         </div>
     </div>
 
-    <!-- 📄 LOG GÖRÜNTÜLEME MODAL PENCERESİ -->
+    <!-- 📄 LOG GÖRÜNTÜLEME MODAL -->
     <div class="modal fade" id="logsModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title font-monospace fw-bold" id="logsTitle">📄 Servis Logları</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="terminal-box mb-0" id="logsOutput" style="font-size: 0.85rem; color: #e2e8f0; border-color: #475569;">Yükleniyor...</div>
@@ -177,20 +189,84 @@
         </div>
     </div>
 
-    <!-- 📊 GEÇMİŞ VERİLER MODAL PENCERESİ -->
+    <!-- 📊 GEÇMİŞ VERİLER MODAL -->
     <div class="modal fade" id="historyModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title font-monospace fw-bold">📊 Son 24 Saatlik Sistem Yükü (Geçmiş)</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <canvas id="historyChart" style="max-height: 400px; width: 100%;"></canvas>
                 </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-outline-info" onclick="fetchHistory()">🔄 Yenile</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🚀 DEPLOY MODAL -->
+    <div class="modal fade" id="deployModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold">🚀 Yeni Servis Kur (Deploy)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="deployForm" onsubmit="deployContainer(event)">
+                        <div class="mb-3">
+                            <label class="form-label">İmaj Adı (Örn: nginx:latest, redis)</label>
+                            <input type="text" id="deployImage" class="form-control" required style="background-color: var(--bg-color); color: var(--text-color);">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Konteyner Adı (Opsiyonel)</label>
+                            <input type="text" id="deployName" class="form-control" placeholder="Örn: my-web-server" style="background-color: var(--bg-color); color: var(--text-color);">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Port Eşleştirme (Opsiyonel)</label>
+                            <input type="text" id="deployPort" class="form-control" placeholder="Örn: 8080:80" style="background-color: var(--bg-color); color: var(--text-color);">
+                            <div class="form-text text-muted">Sol taraf dış (host) portu, sağ taraf iç porttur.</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold" id="deployBtnText">🚀 Kur ve Başlat</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🔔 ALARMLAR MODAL -->
+    <div class="modal fade" id="alertsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold">🔔 Son 50 Sistem Bildirimi</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="list-group" id="alertsList">
+                        <li class="list-group-item text-center text-muted" style="background-color: var(--bg-color);">Yükleniyor...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🧹 İMAJ YÖNETİMİ MODAL -->
+    <div class="modal fade" id="imagesModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold">🧹 İmaj Yönetimi ve Disk Temizliği</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <h6>Sistemdeki İmajlar</h6>
+                        <button class="btn btn-sm btn-danger fw-bold" onclick="pruneImages()">🗑️ Kullanılmayanları Sil (Prune)</button>
+                    </div>
+                    <ul class="list-group" id="imagesList">
+                        <li class="list-group-item text-center text-muted" style="background-color: var(--bg-color);">Yükleniyor...</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -212,10 +288,10 @@
         });
 
         let currentContainerId = null;
-        let mainContainerId = null; // Ana monitor konteynerimizin ID'sini hafızada tutar!
-        let currentLogsContainerId = null; // Log görüntüleme için ID
+        let mainContainerId = null;
+        let currentLogsContainerId = null;
+        let userRole = 'viewer';
 
-        // --- TEMA GEÇİŞ MANTIĞI ---
         function toggleTheme() {
             const htmlTag = document.documentElement;
             const themeBtn = document.getElementById('themeBtn');
@@ -232,7 +308,6 @@
             }
         }
         
-        // Sayfa yüklendiğinde eski temayı hatırla
         document.addEventListener('DOMContentLoaded', () => {
             const savedTheme = localStorage.getItem('cloudpulse-theme');
             if (savedTheme === 'light') {
@@ -246,21 +321,15 @@
         function openTerminal(id, name) {
             currentContainerId = id;
             document.getElementById('terminalTitle').innerText = `💻 Canlı Terminal | ${name} (${id})`;
-            document.getElementById('terminalOutput').innerText = `--- [ ${name} ] servisine bağlanıldı ---\nKomutlarınızı doğrudan bu konteyner içinde çalıştırabilirsiniz.\n\n`;
+            document.getElementById('terminalOutput').innerText = `Bağlantı hazır.\n\n`;
             new bootstrap.Modal(document.getElementById('terminalModal')).show();
             setTimeout(() => document.getElementById('cmdInput').focus(), 500);
         }
 
-        // ⚡ YENİ: Ana sistem Terminali Butonu
         function openMainTerminal() {
-            if (mainContainerId) {
-                openTerminal(mainContainerId, 'devops-monitor (Ana Sistem)');
-            } else {
-                showAlert("Ana sistem ID'si henüz yüklenmedi, lütfen 2 saniye bekleyin.", "warning");
-            }
+            if (mainContainerId) openTerminal(mainContainerId, 'devops-monitor (Ana Sistem)');
         }
 
-        // 📄 YENİ: Logları Gösterme Fonksiyonu
         async function openLogs(id, name) {
             currentLogsContainerId = id;
             document.getElementById('logsTitle').innerText = `📄 Loglar | ${name}`;
@@ -276,20 +345,14 @@
             try {
                 const res = await fetch(`/api/containers/${currentLogsContainerId}/logs`);
                 const data = await res.json();
-                if (data.status === "success") {
-                    outBox.innerText = data.logs || "(Log kaydı bulunamadı)";
-                } else {
-                    outBox.innerText = `Hata: ${data.logs}`;
-                }
+                outBox.innerText = data.logs || "(Log kaydı bulunamadı)";
             } catch (err) {
-                outBox.innerText = `Ağ hatası veya sunucuya ulaşılamıyor.`;
+                outBox.innerText = `Ağ hatası!`;
             }
             outBox.scrollTop = outBox.scrollHeight;
         }
 
-        // 📊 YENİ: Geçmiş Veriler Grafiği
         let historyChartInstance = null;
-
         async function openHistoryModal() {
             new bootstrap.Modal(document.getElementById('historyModal')).show();
             await fetchHistory();
@@ -300,14 +363,9 @@
                 const res = await fetch('/api/stats/history');
                 const data = await res.json();
                 if (data.status === "success") {
-                    if (historyChartInstance) {
-                        historyChartInstance.destroy();
-                    }
+                    if (historyChartInstance) historyChartInstance.destroy();
                     const ctxHist = document.getElementById('historyChart').getContext('2d');
-                    
-                    // Zamanı sadece saat:dakika olarak al
                     const timeLabels = data.labels.map(t => t.substring(11, 16));
-
                     historyChartInstance = new Chart(ctxHist, {
                         type: 'line',
                         data: {
@@ -319,13 +377,8 @@
                         },
                         options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
                     });
-                } else {
-                    showAlert("Geçmiş veriler alınamadı: " + data.message, "danger");
                 }
-            } catch (err) {
-                console.error("Geçmiş veri çekilemedi:", err);
-                showAlert("Geçmiş veriler alınırken hata oluştu!", "danger");
-            }
+            } catch (err) { console.error("Geçmiş veri çekilemedi:", err); }
         }
 
         async function executeCommand(e) {
@@ -337,8 +390,6 @@
             const outBox = document.getElementById('terminalOutput');
             outBox.innerText += `root@docker:~# ${cmd}\n`;
             input.value = '';
-            outBox.scrollTop = outBox.scrollHeight;
-
             try {
                 const res = await fetch(`/api/containers/${currentContainerId}/exec`, {
                     method: 'POST',
@@ -347,9 +398,7 @@
                 });
                 const data = await res.json();
                 outBox.innerText += `${data.output}\n\n`;
-            } catch (err) {
-                outBox.innerText += `[HATA]: Bağlantı koptu veya komut iletilemedi!\n\n`;
-            }
+            } catch (err) { outBox.innerText += `[HATA]\n\n`; }
             outBox.scrollTop = outBox.scrollHeight;
         }
 
@@ -359,16 +408,6 @@
             box.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
             box.classList.remove('d-none');
             setTimeout(() => box.classList.add('d-none'), 5000);
-        }
-
-        async function testTelegram() {
-            try {
-                showAlert("Telegram'a bildirim gönderiliyor...", "info");
-                const res = await fetch('/api/test-telegram', { method: 'POST' });
-                const data = await res.json();
-                if (res.ok) { showAlert(data.message, "success"); } 
-                else { showAlert(data.message, "danger"); }
-            } catch (e) { showAlert("Ağ hatası oluştu!", "danger"); }
         }
 
         async function fetchStats() {
@@ -381,6 +420,18 @@
                 document.getElementById('mem-val').innerText = `%${data.memory.percent}`;
                 document.getElementById('mem-detail').innerText = `${data.memory.used_gb} GB / ${data.memory.total_gb} GB`;
                 document.getElementById('disk-val').innerText = `%${data.disk.percent}`;
+
+                userRole = data.role;
+                const roleBadge = document.getElementById('roleBadge');
+                if (userRole === 'admin') {
+                    roleBadge.innerText = '🛡️ Admin';
+                    roleBadge.className = 'badge bg-danger me-3';
+                    document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('d-none'));
+                } else {
+                    roleBadge.innerText = '👁️ İzleyici';
+                    roleBadge.className = 'badge bg-secondary me-3';
+                    document.querySelectorAll('.admin-only').forEach(el => el.classList.add('d-none'));
+                }
 
                 const now = new Date().toLocaleTimeString();
                 if (sysChart.data.labels.length > 10) {
@@ -411,13 +462,19 @@
                     const isUp = c.status.toLowerCase().includes('up') || c.status.toLowerCase().includes('running');
                     const badgeClass = isUp ? 'badge-running' : 'badge-exited';
                     
-                    // Ana izleme panelimizin ID'sini otomatik olarak yakala ve hafızaya al!
-                    if (c.name === 'devops-monitor') {
-                        mainContainerId = c.id;
-                    }
+                    if (c.name === 'devops-monitor') mainContainerId = c.id;
 
-                    const terminalBtn = isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li>` : '';
-                    const logsBtn = `<li><a class="dropdown-item text-secondary fw-bold" href="#" onclick="openLogs('${c.id}', '${c.name}')">📄 Logları Gör</a></li><li><hr class="dropdown-divider"></li>`;
+                    // Admin butonları
+                    const adminActions = userRole === 'admin' ? `
+                        ${isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li>` : ''}
+                        <li><a class="dropdown-item text-primary" href="#" onclick="setLimit('${c.id}')">⚖️ RAM Limiti Koy</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-success" href="#" onclick="manageAction('${c.id}', 'start')">▶️ Başlat</a></li>
+                        <li><a class="dropdown-item text-warning" href="#" onclick="manageAction('${c.id}', 'restart')">🔄 Yeniden Başlat</a></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="manageAction('${c.id}', 'stop')">⏸️ Durdur</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Sil (Kaldır)</a></li>
+                    ` : '';
 
                     tbody.innerHTML += `
                         <tr>
@@ -426,16 +483,11 @@
                             <td>
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
-                                        ⚡ Yönet
+                                        ⚡ İşlem
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-dark">
-                                        ${terminalBtn}
-                                        ${logsBtn}
-                                        <li><a class="dropdown-item text-success" href="#" onclick="manageAction('${c.id}', 'start')">▶️ Başlat</a></li>
-                                        <li><a class="dropdown-item text-warning" href="#" onclick="manageAction('${c.id}', 'restart')">🔄 Yeniden Başlat</a></li>
-                                        <li><a class="dropdown-item text-danger" href="#" onclick="manageAction('${c.id}', 'stop')">⏸️ Durdur</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Sil (Kaldır)</a></li>
+                                        <li><a class="dropdown-item text-secondary fw-bold" href="#" onclick="openLogs('${c.id}', '${c.name}')">📄 Logları Gör</a></li>
+                                        ${adminActions}
                                     </ul>
                                 </div>
                             </td>
@@ -446,17 +498,114 @@
         }
 
         async function manageAction(id, action) {
-            if (action === 'delete' && !confirm("Bu konteyneri kalıcı olarak silmek istediğinize emin misiniz?")) return;
+            if (action === 'delete' && !confirm("Silmek istediğinize emin misiniz?")) return;
             try {
                 const res = await fetch(`/api/containers/${id}/${action}`, { method: 'POST' });
                 const data = await res.json();
-                if (res.ok) {
-                    showAlert(data.message, "success");
+                showAlert(data.message, res.ok ? "success" : "danger");
+                fetchContainers();
+            } catch (e) { showAlert("Hata oluştu!", "danger"); }
+        }
+
+        // --- YENİ EKLENEN ÖZELLİKLER ---
+
+        function openDeployModal() {
+            new bootstrap.Modal(document.getElementById('deployModal')).show();
+        }
+
+        async function deployContainer(e) {
+            e.preventDefault();
+            const btn = document.getElementById('deployBtnText');
+            btn.innerText = "Kuruluyor, Lütfen Bekleyin...";
+            btn.disabled = true;
+
+            const payload = {
+                image: document.getElementById('deployImage').value,
+                name: document.getElementById('deployName').value,
+                port: document.getElementById('deployPort').value
+            };
+
+            try {
+                const res = await fetch('/api/containers/deploy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                showAlert(data.message, res.ok ? "success" : "danger");
+                if(res.ok) {
+                    document.getElementById('deployForm').reset();
+                    bootstrap.Modal.getInstance(document.getElementById('deployModal')).hide();
                     fetchContainers();
-                } else {
-                    showAlert(data.message, "danger");
                 }
-            } catch (e) { showAlert("İşlem sırasında bir hata oluştu!", "danger"); }
+            } catch(e) { showAlert("Ağ hatası!", "danger"); }
+            
+            btn.innerText = "🚀 Kur ve Başlat";
+            btn.disabled = false;
+        }
+
+        async function openAlertsModal() {
+            new bootstrap.Modal(document.getElementById('alertsModal')).show();
+            const ul = document.getElementById('alertsList');
+            ul.innerHTML = '<li class="list-group-item text-center text-muted">Yükleniyor...</li>';
+            try {
+                const res = await fetch('/api/alerts');
+                const data = await res.json();
+                if(data.status === 'success') {
+                    ul.innerHTML = '';
+                    if(data.alerts.length === 0) {
+                        ul.innerHTML = '<li class="list-group-item text-center">Hiç alarm kaydı yok.</li>';
+                    }
+                    data.alerts.forEach(a => {
+                        ul.innerHTML += `<li class="list-group-item" style="background-color: var(--bg-color); color: var(--text-color);">
+                            <small class="text-danger fw-bold">[${a.time}]</small><br>
+                            <span style="white-space: pre-wrap;">${a.message}</span>
+                        </li>`;
+                    });
+                }
+            } catch(e) {}
+        }
+
+        async function openImagesModal() {
+            new bootstrap.Modal(document.getElementById('imagesModal')).show();
+            const ul = document.getElementById('imagesList');
+            ul.innerHTML = '<li class="list-group-item text-center text-muted">Yükleniyor...</li>';
+            try {
+                const res = await fetch('/api/images');
+                const data = await res.json();
+                ul.innerHTML = '';
+                data.images.forEach(img => {
+                    ul.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center" style="background-color: var(--bg-color); color: var(--text-color);">
+                        <span class="font-monospace">${img.tag}</span>
+                        <span class="badge bg-secondary rounded-pill">${img.size_mb} MB</span>
+                    </li>`;
+                });
+            } catch(e) {}
+        }
+
+        async function pruneImages() {
+            if(!confirm("Kullanılmayan imajlar silinecek. Emin misiniz?")) return;
+            try {
+                showAlert("Disk temizleniyor...", "info");
+                const res = await fetch('/api/system/prune', { method: 'POST' });
+                const data = await res.json();
+                showAlert(data.message, res.ok ? "success" : "danger");
+                openImagesModal(); // Yenile
+            } catch(e) {}
+        }
+
+        async function setLimit(id) {
+            const limit = prompt("Bu servis için MB cinsinden RAM limiti girin (Örn: 512):");
+            if(!limit) return;
+            try {
+                const res = await fetch(`/api/containers/${id}/limit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mem_limit_mb: limit })
+                });
+                const data = await res.json();
+                showAlert(data.message, res.ok ? "success" : "danger");
+            } catch(e) {}
         }
 
         setInterval(fetchStats, 2000);

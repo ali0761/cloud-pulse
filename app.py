@@ -16,10 +16,12 @@ app.secret_key = os.environ.get("FLASK_SECRET", "cloudpulse-super-gizli-2026-dev
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8505924463:AAFJsvvg3v8CgI6kNZuZsxN5bkbn7rOG6xA")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "985168129")
 
-# 🔒 GÜÇLÜ GİRİŞ BİLGİLERİMİZ
+# 🔒 GÜÇLÜ GİRİŞ BİLGİLERİMİZ (Admin ve Viewer)
 ADMIN_USER = os.environ.get("ADMIN_USER", "sysadmin")
-RAW_PASSWORD = os.environ.get("ADMIN_PASS", "CloudPulse.2026!Secure#")
-ADMIN_PASS_HASH = generate_password_hash(RAW_PASSWORD)
+ADMIN_PASS_HASH = generate_password_hash(os.environ.get("ADMIN_PASS", "CloudPulse.2026!Secure#"))
+
+VIEWER_USER = os.environ.get("VIEWER_USER", "guest")
+VIEWER_PASS_HASH = generate_password_hash(os.environ.get("VIEWER_PASS", "Guest123"))
 
 # --- VERİTABANI VE GEÇMİŞ İZLEME ---
 DB_NAME = 'cloudpulse.db'
@@ -32,6 +34,11 @@ def init_db():
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     cpu REAL,
                     ram REAL
+                )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS alerts_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    message TEXT
                 )''')
     conn.commit()
     conn.close()
@@ -46,13 +53,15 @@ def background_db_worker():
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             c.execute("INSERT INTO stats_history (cpu, ram) VALUES (?, ?)", (cpu_percent, mem_percent))
-            # 7 Günden eski verileri sil (Disk dolmasın)
+            # 7 Günden eski verileri sil
             c.execute("DELETE FROM stats_history WHERE timestamp <= datetime('now', '-7 days')")
+            # En fazla 1000 alarm kalsın
+            c.execute("DELETE FROM alerts_history WHERE id NOT IN (SELECT id FROM alerts_history ORDER BY id DESC LIMIT 1000)")
             conn.commit()
             conn.close()
         except Exception as e:
             print("DB Worker Hatası:", e)
-        time.sleep(300) # 5 Dakika bekle (300 saniye)
+        time.sleep(300) # 5 Dakika bekle
 
 # Veritabanını kur ve arkaplan işçisini başlat
 init_db()
@@ -60,8 +69,8 @@ threading.Thread(target=background_db_worker, daemon=True).start()
 
 # --- SPAM VE BİLİNÇLİ DURDURMA KORUMASI ---
 last_alert_times = {}
-ALERT_COOLDOWN = 300  # Aynı uyarıyı 5 dakikada (300 sn) bir gönder
-muted_containers = set()  # Bizim durdurduğumuz servislerin alarm atmamasını sağlayan hafıza!
+ALERT_COOLDOWN = 300
+muted_containers = set()
 
 def send_telegram_alert(alert_key, message, force=False):
     global last_alert_times
@@ -70,6 +79,16 @@ def send_telegram_alert(alert_key, message, force=False):
     if not force and alert_key in last_alert_times:
         if now - last_alert_times[alert_key] < ALERT_COOLDOWN:
             return False
+
+    # Veritabanına kaydet
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("INSERT INTO alerts_history (message) VALUES (?)", (message,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Alert DB kayıt hatası:", e)
 
     if TELEGRAM_TOKEN == "BURAYA_BOTFATHER_TOKEN_GELECEK":
         print("UYARI: Telegram Token ayarlanmamış!")
@@ -95,12 +114,27 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('role') != 'admin':
+            return jsonify({"status": "error", "message": "Yetkisiz Erişim! Sadece adminler bu işlemi yapabilir."}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
     if request.method == 'POST':
-        if request.form['username'] == ADMIN_USER and check_password_hash(ADMIN_PASS_HASH, request.form['password']):
+        username = request.form['username']
+        password = request.form['password']
+        if username == ADMIN_USER and check_password_hash(ADMIN_PASS_HASH, password):
             session['logged_in'] = True
+            session['role'] = 'admin'
+            return redirect(url_for('index'))
+        elif username == VIEWER_USER and check_password_hash(VIEWER_PASS_HASH, password):
+            session['logged_in'] = True
+            session['role'] = 'viewer'
             return redirect(url_for('index'))
         else:
             error = 'Hatalı Kullanıcı Adı veya Şifre!'
@@ -109,12 +143,13 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
+    session.pop('role', None)
     return redirect(url_for('login'))
 
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', role=session.get('role', 'viewer'))
 
 @app.route('/api/stats')
 @login_required
@@ -126,16 +161,16 @@ def get_stats():
     mem_percent = memory.percent
     disk = psutil.disk_usage('/')
     
-    # 🚨 PROAKTİF KONTROL: RAM veya CPU %80'i geçerse otomatik Telegram at!
     if cpu_percent >= 80.0:
         send_telegram_alert("high_cpu", f"🚨 *KRİTİK UYARI: Yüksek CPU!*\n\n🖥️ Sunucu işlemci yükü *%{cpu_percent}* seviyesine ulaştı! Lütfen sistemi kontrol edin.")
     if mem_percent >= 80.0:
-        send_telegram_alert("high_mem", f"🚨 *KRİTİK UYARI: Yüksek RAM!*\n\n💾 12 GB sunucuda bellek kullanımı *%{mem_percent}* (*{mem_used_gb} GB*) seviyesine çıktı!")
+        send_telegram_alert("high_mem", f"🚨 *KRİTİK UYARI: Yüksek RAM!*\n\n💾 Sunucuda bellek kullanımı *%{mem_percent}* (*{mem_used_gb} GB*) seviyesine çıktı!")
 
     return jsonify({
         "cpu": {"percent": cpu_percent},
         "memory": {"total_gb": mem_total_gb, "used_gb": mem_used_gb, "percent": mem_percent},
-        "disk": {"percent": disk.percent}
+        "disk": {"percent": disk.percent},
+        "role": session.get('role', 'viewer') # Arayüze rol bilgisini gönder
     })
 
 @app.route('/api/stats/history')
@@ -144,19 +179,28 @@ def get_stats_history():
     try:
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        # Son 24 saatteki kayıtları getir, en fazla 288 satır (24 saat * 12 kayıt/saat)
         c.execute("SELECT datetime(timestamp, 'localtime'), cpu, ram FROM stats_history ORDER BY id DESC LIMIT 288")
         rows = c.fetchall()
         conn.close()
-        
-        # En eski tarihten yeniye doğru sıralamak için listeyi ters çevir
         rows.reverse()
-        
         labels = [r[0] for r in rows]
         cpus = [r[1] for r in rows]
         rams = [r[2] for r in rows]
-        
         return jsonify({"status": "success", "labels": labels, "cpus": cpus, "rams": rams})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/alerts')
+@login_required
+def get_alerts():
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("SELECT datetime(timestamp, 'localtime'), message FROM alerts_history ORDER BY id DESC LIMIT 50")
+        rows = c.fetchall()
+        conn.close()
+        alerts = [{"time": r[0], "message": r[1]} for r in rows]
+        return jsonify({"status": "success", "alerts": alerts})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -170,12 +214,9 @@ def get_containers():
             status = container.status
             name = container.name
             
-            # 🧠 AKILLI ÇÖKME KONTROLÜ (Exit Code & Mute Listesi)
             if "exited" in status.lower() or "dead" in status.lower():
                 exit_code = container.attrs.get('State', {}).get('ExitCode', 0)
                 error_msg = container.attrs.get('State', {}).get('Error', '')
-                
-                # Sadece biz durdurmadıysak VE gerçek bir hatayla çöktüyse alarm at!
                 if name not in muted_containers and (exit_code != 0 or error_msg):
                     send_telegram_alert(
                         f"crash_{name}", 
@@ -194,30 +235,30 @@ def get_containers():
 
 @app.route('/api/containers/<container_id>/<action>', methods=['POST'])
 @login_required
+@admin_required
 def manage_container(container_id, action):
     try:
         client = docker.from_env()
         container = client.containers.get(container_id)
         
-        # 🛡️ İNTİHAR KORUMASI
         if container.name == "devops-monitor" and action in ["stop", "delete"]:
             return jsonify({"status": "error", "message": "Güvenlik Engeli: Aktif izleme panelini arayüzden durduramaz veya silemezsiniz!"}), 403
 
         if action == "start":
             muted_containers.discard(container.name)
             container.start()
-            send_telegram_alert(f"action_{container.name}", f"▶️ *SERVİS BAŞLATILDI*\n\n`{container.name}` servisi arayüzden basılarak aktifleştirildi.", force=True)
+            send_telegram_alert(f"action_{container.name}", f"▶️ *SERVİS BAŞLATILDI*\n\n`{container.name}` servisi arayüzden aktifleştirildi.", force=True)
         elif action == "stop":
-            muted_containers.add(container.name)  # ⚡ BİLİNÇLİ DURDURMA: Alarm attırma!
+            muted_containers.add(container.name)
             container.stop()
-            send_telegram_alert(f"action_{container.name}", f"⏸️ *SERVİS DURDURULDU*\n\n`{container.name}` servisi arayüzden bilinçli olarak durduruldu.", force=True)
+            send_telegram_alert(f"action_{container.name}", f"⏸️ *SERVİS DURDURULDU*\n\n`{container.name}` servisi arayüzden bilinçli durduruldu.", force=True)
         elif action == "restart":
             muted_containers.discard(container.name)
             container.restart()
             send_telegram_alert(f"action_{container.name}", f"🔄 *SERVİS YENİDEN BAŞLATILDI*\n\n`{container.name}` servisi arayüzden yeniden başlatıldı.", force=True)
         elif action == "delete":
             container.remove(force=True)
-            send_telegram_alert(f"action_{container.name}", f"🗑️ *SERVİS SİLİNDİ*\n\n`{container.name}` servisi kalıcı olarak kaldırıldı!", force=True)
+            send_telegram_alert(f"action_{container.name}", f"🗑️ *SERVİS SİLİNDİ*\n\n`{container.name}` servisi kaldırıldı!", force=True)
         else:
             return jsonify({"status": "error", "message": "Geçersiz işlem!"}), 400
             
@@ -225,61 +266,120 @@ def manage_container(container_id, action):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/containers/deploy', methods=['POST'])
+@login_required
+@admin_required
+def deploy_container():
+    try:
+        data = request.get_json()
+        image = data.get('image', '').strip()
+        name = data.get('name', '').strip()
+        port_mapping = data.get('port', '').strip()
+
+        if not image:
+            return jsonify({"status": "error", "message": "İmaj adı boş olamaz!"}), 400
+
+        client = docker.from_env()
+        ports = {}
+        if port_mapping:
+            parts = port_mapping.split(':')
+            if len(parts) == 2:
+                ports[f"{parts[1]}/tcp"] = int(parts[0])
+
+        kwargs = {'detach': True}
+        if name: kwargs['name'] = name
+        if ports: kwargs['ports'] = ports
+
+        client.containers.run(image, **kwargs)
+        send_telegram_alert("deploy", f"🚀 *YENİ SERVİS KURULDU*\n\n`{image}` imajı başarıyla başlatıldı.", force=True)
+        return jsonify({"status": "success", "message": f"{image} başarıyla kuruldu ve başlatıldı!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/containers/<container_id>/limit', methods=['POST'])
+@login_required
+@admin_required
+def limit_container(container_id):
+    try:
+        data = request.get_json()
+        mem_mb = data.get('mem_limit_mb')
+        if not mem_mb:
+            return jsonify({"status": "error", "message": "Geçersiz limit değeri."}), 400
+            
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        container.update(mem_limit=f"{mem_mb}m")
+        send_telegram_alert("limit", f"🔒 *LİMİT GÜNCELLENDİ*\n\n`{container.name}` servisine {mem_mb} MB RAM limiti koyuldu.", force=True)
+        return jsonify({"status": "success", "message": f"{container.name} için limit {mem_mb} MB olarak güncellendi."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/images')
+@login_required
+def list_images():
+    try:
+        client = docker.from_env()
+        images = []
+        for img in client.images.list():
+            if img.tags:
+                tag = img.tags[0]
+                size_mb = round(img.attrs['Size'] / (1024 * 1024), 2)
+                images.append({"id": img.short_id, "tag": tag, "size_mb": size_mb})
+        return jsonify({"status": "success", "images": images})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/system/prune', methods=['POST'])
+@login_required
+@admin_required
+def prune_system():
+    try:
+        client = docker.from_env()
+        res = client.images.prune(filters={'dangling': False})
+        reclaimed = res.get('SpaceReclaimed', 0)
+        reclaimed_mb = round(reclaimed / (1024*1024), 2)
+        send_telegram_alert("prune", f"🧹 *DİSK TEMİZLİĞİ YAPILDI*\n\nSunucuda kullanılmayan imajlar silindi. Boşaltılan alan: {reclaimed_mb} MB.", force=True)
+        return jsonify({"status": "success", "message": f"Kullanılmayan imajlar silindi. Boşaltılan alan: {reclaimed_mb} MB."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/test-telegram', methods=['POST'])
 @login_required
+@admin_required
 def test_telegram():
-    success = send_telegram_alert("test_alert", "⚡ *CLOUDPULSE ALARM TESTİ*\n\nHarika! Telegram bot entegrasyonu başarıyla çalışıyor! 🚀 Sunucundan gelen bildirimler artık burada görünecek.", force=True)
+    success = send_telegram_alert("test_alert", "⚡ *CLOUDPULSE ALARM TESTİ*\n\nHarika! Telegram bot entegrasyonu başarıyla çalışıyor! 🚀", force=True)
     if success:
-        return jsonify({"status": "success", "message": "Telegram bildirim testi başarıyla cep telefonuna gönderildi! 📱"})
+        return jsonify({"status": "success", "message": "Telegram bildirim testi başarıyla gönderildi! 📱"})
     else:
-        return jsonify({"status": "error", "message": "Telegram bildirimi gönderilemedi! Token veya Chat ID'nizi kontrol edin."}), 500
+        return jsonify({"status": "error", "message": "Telegram bildirimi gönderilemedi!"}), 500
 
-# 📄 YENİ: KONTEYNER LOGLARI API'Sİ
 @app.route('/api/containers/<container_id>/logs', methods=['GET'])
 @login_required
 def get_container_logs(container_id):
     try:
         client = docker.from_env()
         container = client.containers.get(container_id)
-        # Son 200 satırı al
         logs = container.logs(tail=200, stdout=True, stderr=True)
         logs_str = logs.decode('utf-8', errors='replace')
         return jsonify({"status": "success", "logs": logs_str})
     except Exception as e:
         return jsonify({"status": "error", "logs": f"Sistem Hatası: {str(e)}"}), 500
 
-
-# 🖥️ YENİ: KONTEYNER İÇİ WEB TERMİNAL API'Sİ
 @app.route('/api/containers/<container_id>/exec', methods=['POST'])
 @login_required
+@admin_required
 def exec_in_container(container_id):
     try:
         data = request.get_json()
         command = data.get('command', '')
-        if not command:
-            return jsonify({"status": "error", "output": "Lütfen bir komut girin!"}), 400
-
+        if not command: return jsonify({"status": "error", "output": "Komut girin!"}), 400
         client = docker.from_env()
         container = client.containers.get(container_id)
-        
-        # Konteyner içinde komutu çalıştır ve çıktısını yakala
         exit_code, output = container.exec_run(command)
-        
-        # Çıktıyı UTF-8 metne çevir (yoksa byte olarak gelir)
-        output_str = output.decode('utf-8', errors='replace') if output else "(Komut çalıştı, çıktı döndürmedi)"
-        
-        return jsonify({
-            "status": "success" if exit_code == 0 else "error",
-            "exit_code": exit_code,
-            "output": output_str
-        })
+        output_str = output.decode('utf-8', errors='replace') if output else "(Komut çalıştı, çıktı yok)"
+        return jsonify({"status": "success" if exit_code == 0 else "error", "exit_code": exit_code, "output": output_str})
     except Exception as e:
         return jsonify({"status": "error", "output": f"Sistem Hatası: {str(e)}"}), 500
-
-
-
-
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
