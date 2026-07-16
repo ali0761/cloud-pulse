@@ -97,20 +97,22 @@
             </div>
         </div>
 
-        <div class="row g-4">
+        <div class="row g-4 d-flex align-items-stretch">
             <div class="col-md-7">
-                <div class="card p-3">
+                <div class="card p-3 h-100 d-flex flex-column">
                     <h5 class="mb-3">📈 Gerçek Zamanlı Sistem Yükü</h5>
-                    <canvas id="sysChart" height="150"></canvas>
+                    <div class="flex-grow-1 d-flex align-items-center">
+                        <canvas id="sysChart" style="max-height: 250px; width: 100%;"></canvas>
+                    </div>
                 </div>
             </div>
             <div class="col-md-5">
-                <div class="card p-3">
+                <div class="card p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">🐳 Docker Servisleri</h5>
                         <button class="btn btn-sm btn-outline-info" onclick="fetchContainers()">Yenile</button>
                     </div>
-                    <div class="table-responsive">
+                    <div class="table-responsive flex-grow-1" style="max-height: 250px; overflow-y: auto;">
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
@@ -358,7 +360,7 @@
                             <td><span class="badge ${badgeClass}">${c.status}</span></td>
                             <td>
                                 <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
                                         ⚡ Yönet
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-dark">
