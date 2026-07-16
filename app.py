@@ -4,6 +4,8 @@ import requests as req_lib
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 import psutil
 import docker
+import sqlite3
+import threading
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -18,6 +20,43 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "985168129")
 ADMIN_USER = os.environ.get("ADMIN_USER", "sysadmin")
 RAW_PASSWORD = os.environ.get("ADMIN_PASS", "CloudPulse.2026!Secure#")
 ADMIN_PASS_HASH = generate_password_hash(RAW_PASSWORD)
+
+# --- VERİTABANI VE GEÇMİŞ İZLEME ---
+DB_NAME = 'cloudpulse.db'
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS stats_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    cpu REAL,
+                    ram REAL
+                )''')
+    conn.commit()
+    conn.close()
+
+def background_db_worker():
+    while True:
+        try:
+            cpu_percent = psutil.cpu_percent(interval=0.5)
+            memory = psutil.virtual_memory()
+            mem_percent = memory.percent
+            
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            c.execute("INSERT INTO stats_history (cpu, ram) VALUES (?, ?)", (cpu_percent, mem_percent))
+            # 7 Günden eski verileri sil (Disk dolmasın)
+            c.execute("DELETE FROM stats_history WHERE timestamp <= datetime('now', '-7 days')")
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print("DB Worker Hatası:", e)
+        time.sleep(300) # 5 Dakika bekle (300 saniye)
+
+# Veritabanını kur ve arkaplan işçisini başlat
+init_db()
+threading.Thread(target=background_db_worker, daemon=True).start()
 
 # --- SPAM VE BİLİNÇLİ DURDURMA KORUMASI ---
 last_alert_times = {}
@@ -98,6 +137,28 @@ def get_stats():
         "memory": {"total_gb": mem_total_gb, "used_gb": mem_used_gb, "percent": mem_percent},
         "disk": {"percent": disk.percent}
     })
+
+@app.route('/api/stats/history')
+@login_required
+def get_stats_history():
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        # Son 24 saatteki kayıtları getir, en fazla 288 satır (24 saat * 12 kayıt/saat)
+        c.execute("SELECT datetime(timestamp, 'localtime'), cpu, ram FROM stats_history ORDER BY id DESC LIMIT 288")
+        rows = c.fetchall()
+        conn.close()
+        
+        # En eski tarihten yeniye doğru sıralamak için listeyi ters çevir
+        rows.reverse()
+        
+        labels = [r[0] for r in rows]
+        cpus = [r[1] for r in rows]
+        rams = [r[2] for r in rows]
+        
+        return jsonify({"status": "success", "labels": labels, "cpus": cpus, "rams": rams})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/containers')
 @login_required
