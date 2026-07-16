@@ -173,5 +173,38 @@ def test_telegram():
     else:
         return jsonify({"status": "error", "message": "Telegram bildirimi gönderilemedi! Token veya Chat ID'nizi kontrol edin."}), 500
 
+
+# 🖥️ YENİ: KONTEYNER İÇİ WEB TERMİNAL API'Sİ
+@app.route('/api/containers/<container_id>/exec', methods=['POST'])
+@login_required
+def exec_in_container(container_id):
+    try:
+        data = request.get_json()
+        command = data.get('command', '')
+        if not command:
+            return jsonify({"status": "error", "output": "Lütfen bir komut girin!"}), 400
+
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        
+        # Konteyner içinde komutu çalıştır ve çıktısını yakala
+        exit_code, output = container.exec_run(command)
+        
+        # Çıktıyı UTF-8 metne çevir (yoksa byte olarak gelir)
+        output_str = output.decode('utf-8', errors='replace') if output else "(Komut çalıştı, çıktı döndürmedi)"
+        
+        return jsonify({
+            "status": "success" if exit_code == 0 else "error",
+            "exit_code": exit_code,
+            "output": output_str
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "output": f"Sistem Hatası: {str(e)}"}), 500
+
+
+
+
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
