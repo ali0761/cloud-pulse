@@ -2,41 +2,36 @@ name: CloudPulse Otomatik CI/CD Dağıtımı 🚀
 
 on:
   push:
-    branches: [ main, master ] # main veya master dalına kod gelince tetiklen
+    branches: [ main, master ]
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest # GitHub'ın kendi geçici robot sunucusunda çalış
+    runs-on: ubuntu-latest
     steps:
     - name: 1. Kodlar Kontrol Ediliyor
       uses: actions/checkout@v3
 
-    - name: 2. Almanya Sunucusuna Bağlanılıyor ve Docker Güncelleniyor 🐳
+    - name: 2. Almanya Sunucusuna Bağlanılıyor ve Docker Compose Başlatılıyor 🐳
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
-          echo "🚀 Otomatik Dağıtım Başladı..."
+          echo "🚀 Otomatik Dağıtım ve SSL Kurulumu Başladı..."
           cd ~/cloud-pulse
           
-          # 1. GitHub'dan en yeni kodları çek
+          # 1. En yeni kodları çek
           git pull origin main || git pull origin master
           
-          # 2. Eski konteyneri durdur ve kaldır
-          sudo docker rm -f devops-monitor || true
+          # 2. Eski sistem varsa temizle
+          sudo docker rm -f devops-monitor nginx-proxy acme-companion || true
           
-          # 3. İmajı yeniden inşa et
-          sudo docker build -t cloud-pulse .
+          # 3. Şifreleri ortama aktar ve Docker Compose orkestrasyonunu başlat!
+          export ADMIN_PASS="${{ secrets.ADMIN_PASS }}"
+          export TELEGRAM_TOKEN="${{ secrets.TELEGRAM_TOKEN }}"
+          export TELEGRAM_CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
           
-          # 4. Yeniden canlı yayına al! (Tüm gizli şifreler GitHub Secrets'tan çekilir)
-          sudo docker run -d -p 80:5000 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -e ADMIN_USER="sysadmin" \
-            -e ADMIN_PASS="${{ secrets.ADMIN_PASS }}" \
-            -e TELEGRAM_TOKEN="${{ secrets.TELEGRAM_TOKEN }}" \
-            -e TELEGRAM_CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            --name devops-monitor cloud-pulse
+          sudo docker compose up -d --build --remove-orphans
             
-          echo "✅ Başarıyla Canlıya Alındı! Sistem çalışıyor."
+          echo "✅ Nginx Reverse Proxy & SSL sistemiyle canlıya alındı!"
