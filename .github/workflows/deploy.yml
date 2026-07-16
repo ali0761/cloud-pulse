@@ -1,0 +1,42 @@
+name: CloudPulse Otomatik CI/CD Dağıtımı 🚀
+
+on:
+  push:
+    branches: [ main, master ] # main veya master dalına kod gelince tetiklen
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # GitHub'ın kendi geçici robot sunucusunda çalış
+    steps:
+    - name: 1. Kodlar Kontrol Ediliyor
+      uses: actions/checkout@v3
+
+    - name: 2. Almanya Sunucusuna Bağlanılıyor ve Docker Güncelleniyor 🐳
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          echo "🚀 Otomatik Dağıtım Başladı..."
+          cd ~/cloud-pulse
+          
+          # 1. GitHub'dan en yeni kodları çek
+          git pull origin main || git pull origin master
+          
+          # 2. Eski konteyneri durdur ve kaldır
+          sudo docker rm -f devops-monitor || true
+          
+          # 3. İmajı yeniden inşa et
+          sudo docker build -t cloud-pulse .
+          
+          # 4. Yeniden canlı yayına al! (Tüm gizli şifreler GitHub Secrets'tan çekilir)
+          sudo docker run -d -p 80:5000 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e ADMIN_USER="sysadmin" \
+            -e ADMIN_PASS="${{ secrets.ADMIN_PASS }}" \
+            -e TELEGRAM_TOKEN="${{ secrets.TELEGRAM_TOKEN }}" \
+            -e TELEGRAM_CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            --name devops-monitor cloud-pulse
+            
+          echo "✅ Başarıyla Canlıya Alındı! Sistem çalışıyor."
