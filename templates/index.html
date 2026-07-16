@@ -25,16 +25,15 @@
             <span class="navbar-brand fw-bold">⚡ CloudPulse <small class="text-muted fs-6">| DevOps Kontrol Paneli</small></span>
             <div class="d-flex align-items-center">
                 <span class="badge bg-success me-3">🟢 Canlı Bağlantı</span>
+                <button onclick="testTelegram()" class="btn btn-sm btn-outline-info fw-bold me-3">📱 Telegram Test</button>
                 <a href="/logout" class="btn btn-sm btn-outline-danger fw-bold">🔒 Güvenli Çıkış</a>
             </div>
         </div>
     </nav>
 
     <div class="container-fluid max-w-7xl">
-        <!-- Bildirim Alanı -->
         <div id="alertBox" class="alert d-none" role="alert"></div>
 
-        <!-- Donanım Kartları -->
         <div class="row g-4 mb-4">
             <div class="col-md-4">
                 <div class="card p-3 text-center">
@@ -57,7 +56,6 @@
             </div>
         </div>
 
-        <!-- Grafik ve Tablo Alanı -->
         <div class="row g-4">
             <div class="col-md-7">
                 <div class="card p-3">
@@ -90,11 +88,8 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS (Açılır Menüler İçin Zorunlu) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
-        // Grafik Kurulumu
         const ctx = document.getElementById('sysChart').getContext('2d');
         const sysChart = new Chart(ctx, {
             type: 'line',
@@ -113,7 +108,17 @@
             box.className = `alert alert-${type} alert-dismissible fade show fw-bold`;
             box.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
             box.classList.remove('d-none');
-            setTimeout(() => box.classList.add('d-none'), 4000);
+            setTimeout(() => box.classList.add('d-none'), 5000);
+        }
+
+        async function testTelegram() {
+            try {
+                showAlert("Telegram'a bildirim gönderiliyor...", "info");
+                const res = await fetch('/api/test-telegram', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) { showAlert(data.message, "success"); } 
+                else { showAlert(data.message, "danger"); }
+            } catch (e) { showAlert("Ağ hatası oluştu!", "danger"); }
         }
 
         async function fetchStats() {
@@ -182,20 +187,16 @@
 
         async function manageAction(id, action) {
             if (action === 'delete' && !confirm("Bu konteyneri kalıcı olarak silmek istediğinize emin misiniz?")) return;
-            
             try {
                 const res = await fetch(`/api/containers/${id}/${action}`, { method: 'POST' });
                 const data = await res.json();
-                
                 if (res.ok) {
                     showAlert(data.message, "success");
-                    fetchContainers(); // Tabloyu anında güncelle!
+                    fetchContainers();
                 } else {
                     showAlert(data.message, "danger");
                 }
-            } catch (e) {
-                showAlert("İşlem sırasında bir hata oluştu!", "danger");
-            }
+            } catch (e) { showAlert("İşlem sırasında bir hata oluştu!", "danger"); }
         }
 
         setInterval(fetchStats, 2000);
