@@ -1,6 +1,6 @@
 import os
 import time
-import requests as req_lib  # Telegram API'sine istek atmak için
+import requests as req_lib
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 import psutil
 import docker
@@ -10,24 +10,24 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "cloudpulse-super-gizli-2026-devops-key")
 
-# 🚨 TELEGRAM AYARLARIMIZ 
+# 🚨 TELEGRAM AYARLARIMIZ (Burayı kendi bilgilerinle doldur!)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8505924463:AAFJsvvg3v8CgI6kNZuZsxN5bkbn7rOG6xA")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "985168129")
 
-# 🔒 GİRİŞ BİLGİLERİMİZ
+# 🔒 GÜÇLÜ GİRİŞ BİLGİLERİMİZ
 ADMIN_USER = os.environ.get("ADMIN_USER", "sysadmin")
 RAW_PASSWORD = os.environ.get("ADMIN_PASS", "CloudPulse.2026!Secure#")
 ADMIN_PASS_HASH = generate_password_hash(RAW_PASSWORD)
 
-# --- SPAM KORUMALI TELEGRAM ALARM MOTORU ---
+# --- SPAM VE BİLİNÇLİ DURDURMA KORUMASI ---
 last_alert_times = {}
-ALERT_COOLDOWN = 300  # Aynı uyarıyı 5 dakikada (300 sn) bir gönder (Telefonu spamlama!)
+ALERT_COOLDOWN = 300  # Aynı uyarıyı 5 dakikada (300 sn) bir gönder
+muted_containers = set()  # Bizim durdurduğumuz servislerin alarm atmamasını sağlayan hafıza!
 
 def send_telegram_alert(alert_key, message, force=False):
     global last_alert_times
     now = time.time()
     
-    # Eğer zorunlu (force) değilse ve cooldown süresi dolmadıysa bildirimi engelle
     if not force and alert_key in last_alert_times:
         if now - last_alert_times[alert_key] < ALERT_COOLDOWN:
             return False
@@ -107,13 +107,23 @@ def get_containers():
         containers = []
         for container in client.containers.list(all=True):
             status = container.status
-            # 🚨 PROAKTİF KONTROL: Eğer bir konteyner "exited" (çökmüş/durmuş) ise bildir!
+            name = container.name
+            
+            # 🧠 AKILLI ÇÖKME KONTROLÜ (Exit Code & Mute Listesi)
             if "exited" in status.lower() or "dead" in status.lower():
-                send_telegram_alert(f"container_{container.name}", f"⚠️ *DOCKER SERVİS ALARMI!*\n\n🐳 `{container.name}` isimli servis durdu veya çöktü!\n*Durum:* `{status}`")
+                exit_code = container.attrs.get('State', {}).get('ExitCode', 0)
+                error_msg = container.attrs.get('State', {}).get('Error', '')
+                
+                # Sadece biz durdurmadıysak VE gerçek bir hatayla çöktüyse alarm at!
+                if name not in muted_containers and (exit_code != 0 or error_msg):
+                    send_telegram_alert(
+                        f"crash_{name}", 
+                        f"🚨 *KRİTİK DOCKER ÇÖKME ALARMI!*\n\n🐳 `{name}` servisi BEKLENMEDİK ŞEKİLDE ÇÖKTÜ!\n*Hata Kodu (Exit Code):* `{exit_code}`\n*Detay:* `{error_msg or 'Bilinmeyen Sistem Hatası'}`"
+                    )
                 
             containers.append({
                 "id": container.short_id,
-                "name": container.name,
+                "name": name,
                 "status": status,
                 "image": container.image.tags[0] if container.image.tags else "bilinmiyor"
             })
@@ -128,16 +138,20 @@ def manage_container(container_id, action):
         client = docker.from_env()
         container = client.containers.get(container_id)
         
+        # 🛡️ İNTİHAR KORUMASI
         if container.name == "devops-monitor" and action in ["stop", "delete"]:
             return jsonify({"status": "error", "message": "Güvenlik Engeli: Aktif izleme panelini arayüzden durduramaz veya silemezsiniz!"}), 403
 
         if action == "start":
+            muted_containers.discard(container.name)
             container.start()
             send_telegram_alert(f"action_{container.name}", f"▶️ *SERVİS BAŞLATILDI*\n\n`{container.name}` servisi arayüzden basılarak aktifleştirildi.", force=True)
         elif action == "stop":
+            muted_containers.add(container.name)  # ⚡ BİLİNÇLİ DURDURMA: Alarm attırma!
             container.stop()
-            send_telegram_alert(f"action_{container.name}", f"⏸️ *SERVİS DURDURULDU*\n\n`{container.name}` servisi arayüzden basılarak durduruldu.", force=True)
+            send_telegram_alert(f"action_{container.name}", f"⏸️ *SERVİS DURDURULDU*\n\n`{container.name}` servisi arayüzden bilinçli olarak durduruldu.", force=True)
         elif action == "restart":
+            muted_containers.discard(container.name)
             container.restart()
             send_telegram_alert(f"action_{container.name}", f"🔄 *SERVİS YENİDEN BAŞLATILDI*\n\n`{container.name}` servisi arayüzden yeniden başlatıldı.", force=True)
         elif action == "delete":
@@ -150,7 +164,6 @@ def manage_container(container_id, action):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# ⚡ YENİ: ARAYÜZDEN ANINDA TEST ETME BUTONU İÇİN API
 @app.route('/api/test-telegram', methods=['POST'])
 @login_required
 def test_telegram():
