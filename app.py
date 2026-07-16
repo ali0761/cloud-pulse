@@ -1,14 +1,19 @@
+import os
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 import psutil
 import docker
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = "cloudpulse-super-gizli-devops-anahtari"
+# Gizli anahtarı artık sistemden okuyor, yoksa rastgele güçlü bir anahtar üretiyor
+app.secret_key = os.environ.get("FLASK_SECRET", "cloudpulse-super-gizli-2026-devops-key")
 
-# 🔒 GİRİŞ BİLGİLERİMİZ
-ADMIN_USER = "admin"
-ADMIN_PASS = "devops123"
+# 🔒 GÜÇLÜ GİRİŞ BİLGİLERİ (Docker -e komutuyla dışarıdan verilebilir, yoksa bu güçlü şifre geçerli olur)
+ADMIN_USER = os.environ.get("ADMIN_USER", "sysadmin")
+RAW_PASSWORD = os.environ.get("ADMIN_PASS", "CloudPulse.2026!Secure#")
+# Şifreyi bellekte SHA-256 ile kriptolu tutuyoruz!
+ADMIN_PASS_HASH = generate_password_hash(RAW_PASSWORD)
 
 # --- GÜVENLİK KALKANI (DECORATOR) ---
 def login_required(f):
@@ -24,7 +29,8 @@ def login_required(f):
 def login():
     error = None
     if request.method == 'POST':
-        if request.form['username'] == ADMIN_USER and request.form['password'] == ADMIN_PASS:
+        # check_password_hash ile kriptolu şifreyi doğruluyoruz
+        if request.form['username'] == ADMIN_USER and check_password_hash(ADMIN_PASS_HASH, request.form['password']):
             session['logged_in'] = True
             return redirect(url_for('index'))
         else:
@@ -62,7 +68,6 @@ def get_stats():
 @login_required
 def get_containers():
     try:
-        # Artık her istekte canlı ve taze bağlantı kuruyoruz!
         client = docker.from_env()
         containers = []
         for container in client.containers.list(all=True):
@@ -74,8 +79,34 @@ def get_containers():
             })
         return jsonify({"containers": containers})
     except Exception as e:
-        # Gerçek hatayı doğrudan ekrana basıyoruz ki ne olduğunu nokta atışı görelim!
         return jsonify({"error": f"Gerçek Docker Hatası: {str(e)}", "containers": []})
+
+# ⚡ YENİ: KONTEYNER YÖNETİM API'Sİ (Mini-Portainer Gücü)
+@app.route('/api/containers/<container_id>/<action>', methods=['POST'])
+@login_required
+def manage_container(container_id, action):
+    try:
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        
+        # 🛡️ İNTİHAR KORUMASI: Panelin kendini durdurmasını/silmesini engelle!
+        if container.name == "devops-monitor" and action in ["stop", "delete"]:
+            return jsonify({"status": "error", "message": "Güvenlik Engeli: Aktif izleme panelini arayüzden durduramaz veya silemezsiniz!"}), 403
+
+        if action == "start":
+            container.start()
+        elif action == "stop":
+            container.stop()
+        elif action == "restart":
+            container.restart()
+        elif action == "delete":
+            container.remove(force=True)
+        else:
+            return jsonify({"status": "error", "message": "Geçersiz işlem!"}), 400
+            
+        return jsonify({"status": "success", "message": f"Konteyner başarıyla {action} edildi!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

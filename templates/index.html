@@ -3,208 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CloudPulse | DevOps Sunucu Yönetim Paneli</title>
-    <!-- Bootstrap 5 CSS CDN -->
+    <title>CloudPulse | DevOps Kontrol Paneli</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Chart.js CDN (Grafikler için) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background-color: #0f172a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        .card-title { color: #94a3b8; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
-        .metric-value { font-size: 2.2rem; font-weight: 700; color: #f8fafc; }
-        .status-badge { font-size: 0.8rem; padding: 0.35em 0.65em; }
+        .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 2rem; font-weight: 700; color: #38bdf8; }
+        .table { --bs-table-bg: transparent; --bs-table-color: #f8fafc; }
+        .table border-color { border-color: #334155; }
+        .badge-running { background-color: #10b981; color: #fff; }
+        .badge-exited { background-color: #ef4444; color: #fff; }
         .navbar { background-color: #1e293b !important; border-bottom: 1px solid #334155; }
     </style>
 </head>
-<body>
+<body class="p-4">
 
-    <!-- Üst Menü -->
-    <nav class="navbar navbar-expand-lg navbar-dark mb-4 py-3">
-        <div class="container">
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="#">
-                <span class="fs-4 me-2">⚡</span> CloudPulse <span class="badge bg-primary ms-2 fs-6">v1.0</span>
-            </a>
-            <span class="navbar-text text-success fw-semibold">
-                ● Canlı Bağlantı (Local / Sunucu)
-            </span>
+    <!-- Üst Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4 rounded px-3">
+        <div class="container-fluid">
+            <span class="navbar-brand fw-bold">⚡ CloudPulse <small class="text-muted fs-6">| DevOps Kontrol Paneli</small></span>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-success me-3">🟢 Canlı Bağlantı</span>
+                <a href="/logout" class="btn btn-sm btn-outline-danger fw-bold">🔒 Güvenli Çıkış</a>
+            </div>
         </div>
     </nav>
 
-    <!-- Ana İçerik -->
-    <div class="container">
-        
-        <!-- Üst Gösterge Kartları -->
+    <div class="container-fluid max-w-7xl">
+        <!-- Bildirim Alanı -->
+        <div id="alertBox" class="alert d-none" role="alert"></div>
+
+        <!-- Donanım Kartları -->
         <div class="row g-4 mb-4">
             <div class="col-md-4">
-                <div class="card p-4">
-                    <div class="card-title">İşlemci (CPU) Yükü</div>
-                    <div class="metric-value" id="cpu-text">%0.0</div>
-                    <div class="progress mt-2" style="height: 6px;">
-                        <div id="cpu-bar" class="progress-bar bg-info" role="progressbar" style="width: 0%"></div>
-                    </div>
+                <div class="card p-3 text-center">
+                    <h6 class="text-muted">CPU KULLANIMI</h6>
+                    <div class="stat-value" id="cpu-val">%0</div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card p-4">
-                    <div class="card-title">Bellek (RAM) Kullanımı</div>
-                    <div class="metric-value" id="ram-text">%0.0</div>
-                    <div class="text-muted small mt-1" id="ram-detail">0 GB / 0 GB</div>
+                <div class="card p-3 text-center">
+                    <h6 class="text-muted">RAM KULLANIMI (12 GB)</h6>
+                    <div class="stat-value" id="mem-val">%0</div>
+                    <small class="text-muted" id="mem-detail">0 GB / 0 GB</small>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card p-4">
-                    <div class="card-title">Disk Doluluk Oranı</div>
-                    <div class="metric-value" id="disk-text">%0.0</div>
-                    <div class="progress mt-2" style="height: 6px;">
-                        <div id="disk-bar" class="progress-bar bg-warning" role="progressbar" style="width: 0%"></div>
-                    </div>
+                <div class="card p-3 text-center">
+                    <h6 class="text-muted">DİSK DOLULUK ORANI</h6>
+                    <div class="stat-value" id="disk-val">%0</div>
                 </div>
             </div>
         </div>
 
-        <!-- Canlı Grafik ve Docker Tablosu -->
+        <!-- Grafik ve Tablo Alanı -->
         <div class="row g-4">
-            <!-- Canlı CPU & RAM Grafigi -->
-            <div class="col-lg-7">
-                <div class="card p-4 h-100">
-                    <h5 class="fw-bold mb-3 text-light">📈 Gerçek Zamanlı Kaynak Tüketimi</h5>
-                    <canvas id="realtimeChart" height="180"></canvas>
+            <div class="col-md-7">
+                <div class="card p-3">
+                    <h5 class="mb-3">📈 Gerçek Zamanlı Sistem Yükü</h5>
+                    <canvas id="sysChart" height="150"></canvas>
                 </div>
             </div>
-
-            <!-- Docker Konteyner Listesi -->
-            <div class="col-lg-5">
-                <div class="card p-4 h-100">
+            <div class="col-md-5">
+                <div class="card p-3">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="fw-bold mb-0 text-light">🐳 Docker Servisleri</h5>
-                        <button class="btn btn-sm btn-outline-light" onclick="fetchContainers()">Yenile</button>
+                        <h5 class="mb-0">🐳 Docker Servisleri</h5>
+                        <button class="btn btn-sm btn-outline-info" onclick="fetchContainers()">Yenile</button>
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-dark table-hover align-middle">
+                        <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
                                     <th>İsim</th>
                                     <th>Durum</th>
-                                    <th class="text-end">İşlem</th>
+                                    <th>İşlem</th>
                                 </tr>
                             </thead>
                             <tbody id="container-list">
-                                <tr>
-                                    <td colspan="3" class="text-center text-muted small py-3">Veriler yükleniyor...</td>
-                                </tr>
+                                <tr><td colspan="3" class="text-center text-muted">Yükleniyor...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
-
     </div>
 
-    <!-- JavaScript - Canlı Veri Akışı ve Grafik Yönetimi -->
+    <!-- Bootstrap JS (Açılır Menüler İçin Zorunlu) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
-        // 1. Grafik Kurulumu (Chart.js)
-        const ctx = document.getElementById('realtimeChart').getContext('2d');
-        const realtimeChart = new Chart(ctx, {
+        // Grafik Kurulumu
+        const ctx = document.getElementById('sysChart').getContext('2d');
+        const sysChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [], // Zaman damgaları
+                labels: [],
                 datasets: [
-                    {
-                        label: 'CPU (%)',
-                        borderColor: '#38bdf8',
-                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                        data: [],
-                        tension: 0.4,
-                        fill: true
-                    },
-                    {
-                        label: 'RAM (%)',
-                        borderColor: '#818cf8',
-                        backgroundColor: 'rgba(129, 140, 248, 0.1)',
-                        data: [],
-                        tension: 0.4,
-                        fill: true
-                    }
+                    { label: 'CPU (%)', borderColor: '#38bdf8', data: [], tension: 0.3 },
+                    { label: 'RAM (%)', borderColor: '#818cf8', data: [], tension: 0.3 }
                 ]
             },
-            options: {
-                responsive: true,
-                scales: {
-                    y: { beginAtZero: true, max: 100 }
-                },
-                animation: { duration: 0 } // Akıcı canlı yayın için animasyonu kapatıyoruz
-            }
+            options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
         });
 
-        // 2. Metrikleri Arka Plandan Çeken Fonksiyon
-        async function fetchStats() {
-            try {
-                const response = await fetch('/api/stats');
-                const data = await response.json();
-
-                // Metinleri Güncelle
-                document.getElementById('cpu-text').innerText = `%${data.cpu.percent}`;
-                document.getElementById('cpu-bar').style.width = `%${data.cpu.percent}`;
-                
-                document.getElementById('ram-text').innerText = `%${data.memory.percent}`;
-                document.getElementById('ram-detail').innerText = `${data.memory.used_gb} GB / ${data.memory.total_gb} GB Kullanılıyor`;
-                
-                document.getElementById('disk-text').innerText = `%${data.disk.percent}`;
-                document.getElementById('disk-bar').style.width = `%${data.disk.percent}`;
-
-                // Grafiğe Yeni Veri Ekle
-                const now = new Date().toLocaleTimeString('tr-TR', { second: '2-digit', minute: '2-digit' });
-                
-                if (realtimeChart.data.labels.length > 10) {
-                    realtimeChart.data.labels.shift();
-                    realtimeChart.data.datasets[0].data.shift();
-                    realtimeChart.data.datasets[1].data.shift();
-                }
-
-                realtimeChart.data.labels.push(now);
-                realtimeChart.data.datasets[0].data.push(data.cpu.percent);
-                realtimeChart.data.datasets[1].data.push(data.memory.percent);
-                realtimeChart.update();
-
-            } catch (error) {
-                console.error("Veri çekilemedi:", error);
-            }
+        function showAlert(message, type="success") {
+            const box = document.getElementById('alertBox');
+            box.className = `alert alert-${type} alert-dismissible fade show fw-bold`;
+            box.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            box.classList.remove('d-none');
+            setTimeout(() => box.classList.add('d-none'), 4000);
         }
 
-        // 3. Docker Konteynerlerini Çeken Fonksiyon
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats');
+                if (res.redirected) { window.location.href = '/login'; return; }
+                const data = await res.json();
+                
+                document.getElementById('cpu-val').innerText = `%${data.cpu.percent}`;
+                document.getElementById('mem-val').innerText = `%${data.memory.percent}`;
+                document.getElementById('mem-detail').innerText = `${data.memory.used_gb} GB / ${data.memory.total_gb} GB`;
+                document.getElementById('disk-val').innerText = `%${data.disk.percent}`;
+
+                const now = new Date().toLocaleTimeString();
+                if (sysChart.data.labels.length > 10) {
+                    sysChart.data.labels.shift();
+                    sysChart.data.datasets[0].data.shift();
+                    sysChart.data.datasets[1].data.shift();
+                }
+                sysChart.data.labels.push(now);
+                sysChart.data.datasets[0].data.push(data.cpu.percent);
+                sysChart.data.datasets[1].data.push(data.memory.percent);
+                sysChart.update();
+            } catch (e) { console.error("Metrik hatası:", e); }
+        }
+
         async function fetchContainers() {
             try {
-                const response = await fetch('/api/containers');
-                const data = await response.json();
+                const res = await fetch('/api/containers');
+                const data = await res.json();
                 const tbody = document.getElementById('container-list');
                 tbody.innerHTML = '';
 
-                if (data.containers.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted small py-3">Çalışan Docker konteyneri bulunamadı.</td></tr>';
+                if (data.error) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="text-danger small">${data.error}</td></tr>`;
                     return;
                 }
 
                 data.containers.forEach(c => {
-                    const statusClass = c.status.includes('up') ? 'bg-success' : 'bg-secondary';
+                    const isUp = c.status.toLowerCase().includes('up') || c.status.toLowerCase().includes('running');
+                    const badgeClass = isUp ? 'badge-running' : 'badge-exited';
+                    
                     tbody.innerHTML += `
                         <tr>
-                            <td class="fw-semibold">${c.name}</td>
-                            <td><span class="badge ${statusClass} status-badge">${c.status}</span></td>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-info py-0" onclick="alert('Faz 4\'te aktif edilecek: ${c.name}')">Yönet</button>
+                            <td class="fw-bold small">${c.name}</td>
+                            <td><span class="badge ${badgeClass}">${c.status}</span></td>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                        ⚡ Yönet
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-dark">
+                                        <li><a class="dropdown-item text-success" href="#" onclick="manageAction('${c.id}', 'start')">▶️ Başlat</a></li>
+                                        <li><a class="dropdown-item text-warning" href="#" onclick="manageAction('${c.id}', 'restart')">🔄 Yeniden Başlat</a></li>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="manageAction('${c.id}', 'stop')">⏸️ Durdur</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Sil (Kaldır)</a></li>
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                     `;
                 });
-            } catch (error) {
-                console.error("Docker verisi çekilemedi:", error);
+            } catch (e) { console.error("Docker hatası:", e); }
+        }
+
+        async function manageAction(id, action) {
+            if (action === 'delete' && !confirm("Bu konteyneri kalıcı olarak silmek istediğinize emin misiniz?")) return;
+            
+            try {
+                const res = await fetch(`/api/containers/${id}/${action}`, { method: 'POST' });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showAlert(data.message, "success");
+                    fetchContainers(); // Tabloyu anında güncelle!
+                } else {
+                    showAlert(data.message, "danger");
+                }
+            } catch (e) {
+                showAlert("İşlem sırasında bir hata oluştu!", "danger");
             }
         }
 
-        // Her 2 saniyede bir verileri otomatik yenile!
         setInterval(fetchStats, 2000);
+        setInterval(fetchContainers, 5000);
         fetchStats();
         fetchContainers();
     </script>
