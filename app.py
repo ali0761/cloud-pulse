@@ -145,6 +145,24 @@ def index():
 @app.route('/api/stats')
 @login_required
 def get_stats():
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
+    return jsonify({
+        "cpu": {"percent": cpu_percent},
+        "memory": {
+            "percent": memory.percent,
+            "used_gb": round(memory.used / (1024**3), 1),
+            "total_gb": round(memory.total / (1024**3), 1)
+        },
+        "disk": {"percent": disk.percent},
+        "role": session.get('role', 'viewer')
+    })
+
+@app.route('/api/stats/history')
+@login_required
+def get_stats_history():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT timestamp, cpu, ram FROM stats_history ORDER BY id DESC LIMIT 60")
@@ -160,9 +178,10 @@ def get_stats():
         ram_data.append(row[2])
 
     return jsonify({
-        "timestamps": timestamps,
-        "cpu": cpu_data,
-        "ram": ram_data
+        "status": "success",
+        "labels": timestamps,
+        "cpus": cpu_data,
+        "rams": ram_data
     })
 
 @app.route('/api/containers')
