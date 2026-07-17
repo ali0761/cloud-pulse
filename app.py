@@ -342,6 +342,25 @@ def deploy_container():
             )
         )
         apps_api.create_namespaced_deployment(namespace="default", body=deployment)
+        
+        # Eğer port yönlendirmesi istenmişse K8s Service (LoadBalancer) oluştur
+        port_mapping = data.get('port', '').strip()
+        if port_mapping and ':' in port_mapping:
+            external_port, internal_port = port_mapping.split(':', 1)
+            service = client.V1Service(
+                metadata=client.V1ObjectMeta(name=name),
+                spec=client.V1ServiceSpec(
+                    type="LoadBalancer",
+                    selector={"app": name},
+                    ports=[client.V1ServicePort(
+                        port=int(external_port),
+                        target_port=int(internal_port)
+                    )]
+                )
+            )
+            core_api.create_namespaced_service(namespace="default", body=service)
+            return jsonify({"status": "success", "message": f"{image} başarıyla başlatıldı ve Dışarıya {external_port} portundan açıldı!"})
+
         return jsonify({"status": "success", "message": f"{image} başarıyla Deployment olarak başlatıldı!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

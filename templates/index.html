@@ -126,7 +126,10 @@
                 <div class="card p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">🔥 Kubernetes Servisleri (Pods)</h5>
-                        <button class="btn btn-sm btn-outline-info" onclick="fetchContainers()">Yenile</button>
+                        <div>
+                            <button class="btn btn-sm btn-success me-2 fw-bold" onclick="openDeployModal()">➕ Yeni Servis Kur</button>
+                            <button class="btn btn-sm btn-outline-info" onclick="fetchContainers()">Yenile</button>
+                        </div>
                     </div>
                     <div class="table-responsive bg-white rounded shadow-sm" style="max-height: 350px; overflow-y: auto;">
                         <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
