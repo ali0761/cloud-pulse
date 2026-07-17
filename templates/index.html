@@ -35,6 +35,9 @@
         .terminal-input:focus { background-color: var(--bg-color); color: #22c55e; border-color: #22c55e; box-shadow: none; }
         .log-line { display: block; word-break: break-all; }
         .log-highlight { background-color: #991b1b; color: white; font-weight: bold; }
+        @media (min-width: 992px) {
+            .dropdown-hover:hover > .dropdown-menu { display: block; margin-top: 0; }
+        }
     </style>
 </head>
 <body class="p-4">
@@ -55,28 +58,20 @@
                     🔔 Bildirimler
                 </button>
 
-                <!-- 📦 COMPOSE KUR BUTONU (Sadece Admin) -->
-                <button onclick="openComposeModal()" class="btn btn-sm btn-outline-secondary fw-bold me-3 admin-only d-none">
-                    📦 Compose Kur
-                </button>
-
-                <!-- 🚀 YENİ SERVİS KUR BUTONU (Sadece Admin) -->
-                <button onclick="openDeployModal()" class="btn btn-sm btn-outline-primary fw-bold me-3 admin-only d-none">
-                    🚀 Yeni Servis
-                </button>
-
-                <!-- 🧹 DİSK TEMİZLİĞİ BUTONU (Sadece Admin) -->
-                <button onclick="openImagesModal()" class="btn btn-sm btn-outline-secondary fw-bold me-3 admin-only d-none">
-                    🧹 İmajlar & Temizlik
-                </button>
-
-                <button onclick="openMainTerminal()" class="btn btn-sm btn-outline-success font-monospace fw-bold me-3 admin-only d-none">
-                    💻 Terminal
-                </button>
-
-                <button onclick="openHistoryModal()" class="btn btn-sm btn-outline-info font-monospace fw-bold me-3">
-                    📊 Geçmiş
-                </button>
+                <!-- 🛠️ ARAÇLAR DROPDOWN -->
+                <div class="dropdown me-3 dropdown-hover">
+                    <button class="btn btn-sm btn-outline-info dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
+                        🛠️ Araçlar
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark shadow-lg">
+                        <li><a class="dropdown-item fw-bold" href="#" onclick="openHistoryModal()">📊 Sistem Geçmişi</a></li>
+                        <li><hr class="dropdown-divider admin-only d-none"></li>
+                        <li><a class="dropdown-item text-primary fw-bold admin-only d-none" href="#" onclick="openDeployModal()">🚀 Yeni Servis Kur</a></li>
+                        <li><a class="dropdown-item text-light fw-bold admin-only d-none" href="#" onclick="openComposeModal()">📦 Compose Kur</a></li>
+                        <li><a class="dropdown-item text-warning fw-bold admin-only d-none" href="#" onclick="openImagesModal()">🧹 İmajlar & Temizlik</a></li>
+                        <li><a class="dropdown-item text-success font-monospace fw-bold admin-only d-none" href="#" onclick="openMainTerminal()">💻 Ana Terminal</a></li>
+                    </ul>
+                </div>
 
                 <!-- Ayarlar -->
                 <div class="dropdown me-3 admin-only d-none">
@@ -151,6 +146,13 @@
                 </div>
             </div>
         </div>
+
+        <!-- 📉 KONTEYNER ANLIK GRAFİKLERİ -->
+        <h5 class="mt-4 mb-3">📉 Konteyner Canlı Performansları</h5>
+        <div class="row g-3 mb-5" id="containerChartsGrid">
+            <!-- JavaScript tarafından dinamik eklenecek -->
+        </div>
+
     </div>
 
     <!-- MODALLAR BAŞLANGIÇ -->
@@ -325,6 +327,9 @@
 
         let currentContainerId = null;
         let mainContainerId = null;
+        
+        let containerCharts = {}; 
+        let containerHistoryData = {};
         
         let currentLogsContainerId = null;
         let rawLogsData = ""; // Filtreleme için saf log verisi
@@ -546,11 +551,70 @@
                     return;
                 }
 
+                const currentIds = [];
+
                 data.containers.forEach(c => {
                     const isUp = c.status.toLowerCase().includes('up') || c.status.toLowerCase().includes('running');
                     const badgeClass = isUp ? 'badge-running' : 'badge-exited';
                     
                     if (c.name === 'devops-monitor') mainContainerId = c.id;
+
+                    if (isUp) {
+                        currentIds.push(c.id);
+                        
+                        const now = new Date().toLocaleTimeString();
+                        if (!containerHistoryData[c.id]) {
+                            containerHistoryData[c.id] = { labels: [], cpu: [], ram: [] };
+                        }
+                        let hist = containerHistoryData[c.id];
+                        
+                        if (hist.labels.length > 20) {
+                            hist.labels.shift();
+                            hist.cpu.shift();
+                            hist.ram.shift();
+                        }
+                        
+                        hist.labels.push(now);
+                        hist.cpu.push(c.stats.cpu);
+                        hist.ram.push(c.stats.ram_percent);
+
+                        let chartCard = document.getElementById('chart-card-' + c.id);
+                        if (!chartCard) {
+                            const grid = document.getElementById('containerChartsGrid');
+                            grid.insertAdjacentHTML('beforeend', `
+                                <div class="col-md-3 col-sm-6" id="chart-card-${c.id}">
+                                    <div class="card p-2 h-100 border-secondary">
+                                        <h6 class="text-center text-truncate small mb-1 mt-1 text-info font-monospace">${c.name}</h6>
+                                        <div style="height: 100px; width: 100%;">
+                                            <canvas id="chart-canvas-${c.id}"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            `);
+                            const ctx = document.getElementById('chart-canvas-' + c.id).getContext('2d');
+                            containerCharts[c.id] = new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: hist.labels,
+                                    datasets: [
+                                        { label: 'CPU %', borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, data: hist.cpu, tension: 0.3, borderWidth: 2, pointRadius: 0 },
+                                        { label: 'RAM %', borderColor: '#818cf8', backgroundColor: 'rgba(129, 140, 248, 0.1)', fill: true, data: hist.ram, tension: 0.3, borderWidth: 2, pointRadius: 0 }
+                                    ]
+                                },
+                                options: { 
+                                    responsive: true, 
+                                    maintainAspectRatio: false,
+                                    scales: { 
+                                        y: { beginAtZero: true, max: 100, display: false },
+                                        x: { display: false }
+                                    },
+                                    plugins: { legend: { display: false } }
+                                }
+                            });
+                        } else {
+                            containerCharts[c.id].update();
+                        }
+                    }
 
                     const adminActions = userRole === 'admin' ? `
                         ${isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li>` : ''}
@@ -585,6 +649,16 @@
                             </td>
                         </tr>
                     `;
+                });
+
+                Object.keys(containerCharts).forEach(id => {
+                    if (!currentIds.includes(id)) {
+                        containerCharts[id].destroy();
+                        delete containerCharts[id];
+                        delete containerHistoryData[id];
+                        const card = document.getElementById('chart-card-' + id);
+                        if (card) card.remove();
+                    }
                 });
             } catch (e) {}
         }
