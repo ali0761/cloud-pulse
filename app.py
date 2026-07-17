@@ -281,6 +281,39 @@ def execute_command(pod_name):
     except Exception as e:
         return jsonify({"status": "error", "output": f"Hata: {str(e)}"})
 
+@app.route('/api/kubernetes/yaml', methods=['POST'])
+@login_required
+@admin_required
+def deploy_yaml():
+    try:
+        data = request.get_json()
+        yaml_content = data.get('yaml', '').strip()
+        if not yaml_content:
+            return jsonify({"status": "error", "message": "YAML içeriği boş olamaz."})
+
+        from kubernetes import utils, client
+        import tempfile
+        import os
+        
+        get_k8s_client() # config.load... işlemlerini tetikler
+        k8s_client = client.ApiClient()
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode='w') as tf:
+            tf.write(yaml_content)
+            temp_path = tf.name
+
+        try:
+            utils.create_from_yaml(k8s_client, temp_path)
+            os.remove(temp_path)
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            return jsonify({"status": "error", "message": f"YAML uygulama hatası: {str(e)}"})
+
+        return jsonify({"status": "success", "message": "YAML başarıyla Kubernetes'e uygulandı!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Hata: {str(e)}"}), 500
+
 @app.route('/api/system/exec', methods=['POST'])
 @login_required
 @admin_required

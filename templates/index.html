@@ -67,7 +67,7 @@
                         <li><a class="dropdown-item fw-bold" href="#" onclick="openHistoryModal()">📊 Sistem Geçmişi</a></li>
                         <li><hr class="dropdown-divider admin-only d-none"></li>
                         <li><a class="dropdown-item text-primary fw-bold admin-only d-none" href="#" onclick="openDeployModal()">🚀 Yeni Servis Kur</a></li>
-                        <li><a class="dropdown-item text-light fw-bold admin-only d-none" href="#" onclick="openComposeModal()">📦 Compose Kur</a></li>
+                        <li><a class="dropdown-item text-light fw-bold admin-only d-none" href="#" onclick="openComposeModal()">📦 K8s YAML Kur</a></li>
                         <li><a class="dropdown-item text-warning fw-bold admin-only d-none" href="#" onclick="openImagesModal()">🧹 İmajlar & Temizlik</a></li>
                         <li><a class="dropdown-item text-success font-monospace fw-bold admin-only d-none" href="#" onclick="openMainTerminal()">💻 Ana Terminal</a></li>
                     </ul>
@@ -126,6 +126,9 @@
                 <div class="card p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">🔥 Kubernetes Servisleri (Pods)</h5>
+                        <a class="navbar-brand text-light fw-bold mx-auto ps-3 d-flex align-items-center" href="#" style="font-size: 1.5rem; letter-spacing: 1px;">
+            <span class="text-info fs-3 me-2">⚡</span>Kube<span class="text-warning">Pulse</span>
+        </a>
                         <div>
                             <button class="btn btn-sm btn-success me-2 fw-bold" onclick="openDeployModal()">➕ Yeni Servis Kur</button>
                             <button class="btn btn-sm btn-outline-info" onclick="fetchContainers()">Yenile</button>
@@ -255,21 +258,21 @@
         </div>
     </div>
 
-    <!-- 📦 DOCKER COMPOSE MODAL -->
+    <!-- 📦 KUBERNETES YAML MODAL -->
     <div class="modal fade" id="composeModal" tabindex="-1">
-        <div class="modal-dialog modal-xl modal-dialog-centered">
-            <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title fw-bold">📦 Docker Compose (Çoklu Kurulum)</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title fw-bold">📦 Kubernetes YAML Uygula (Deploy)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="composeForm" onsubmit="deployCompose(event)">
                         <div class="mb-3">
-                            <label class="form-label text-warning fw-bold">docker-compose.yml içeriğini aşağıya yapıştırın:</label>
-                            <textarea id="composeYaml" class="form-control font-monospace" rows="12" required style="background-color: #050505; color: #38bdf8; border: 1px solid #334155;" placeholder="version: '3'&#10;services:&#10;  web:&#10;    image: nginx:alpine&#10;    ports:&#10;      - '8080:80'"></textarea>
+                            <label class="form-label text-warning fw-bold">K8s Deployment/Service/Pod YAML içeriğini aşağıya yapıştırın:</label>
+                            <textarea id="composeYaml" class="form-control font-monospace" rows="12" required style="background-color: #050505; color: #38bdf8; border: 1px solid #334155;" placeholder="apiVersion: apps/v1&#10;kind: Deployment&#10;metadata:&#10;  name: nginx-deployment&#10;spec:&#10;  replicas: 1&#10;  selector:&#10;    matchLabels:&#10;      app: nginx&#10;  template:&#10;    metadata:&#10;      labels:&#10;        app: nginx&#10;    spec:&#10;      containers:&#10;      - name: nginx&#10;        image: nginx:latest&#10;        ports:&#10;        - containerPort: 80"></textarea>
                         </div>
-                        <button type="submit" class="btn btn-light w-100 fw-bold" id="composeBtnText">📦 Compose'u Ayağa Kaldır (up -d)</button>
+                        <button type="submit" class="btn btn-light w-100 fw-bold" id="composeBtnText">🚀 YAML'ı Küme Üzerinde Çalıştır (Apply)</button>
                     </form>
                 </div>
             </div>
@@ -738,17 +741,17 @@
         async function deployCompose(e) {
             e.preventDefault();
             const btn = document.getElementById('composeBtnText');
-            btn.innerText = "Yükleniyor... Biraz zaman alabilir"; btn.disabled = true;
+            btn.innerText = "Yükleniyor... Lütfen bekleyin..."; btn.disabled = true;
             try {
-                const res = await fetch('/api/containers/compose', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                const res = await fetch('/api/kubernetes/yaml', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ yaml: document.getElementById('composeYaml').value })
                 });
                 const data = await res.json();
-                showAlert(data.message, res.ok ? "success" : "danger");
+                showAlert(data.message, data.status === 'success' ? 'success' : 'danger');
                 if(res.ok) { document.getElementById('composeForm').reset(); bootstrap.Modal.getInstance(document.getElementById('composeModal')).hide(); fetchContainers(); }
-            } catch(e) { showAlert("Ağ hatası!", "danger"); }
-            btn.innerText = "📦 Compose'u Ayağa Kaldır (up -d)"; btn.disabled = false;
+            } catch(err) { showAlert('Hata oluştu.', 'danger'); }
+            btn.innerText = "🚀 YAML'ı Küme Üzerinde Çalıştır (Apply)"; btn.disabled = false;
         }
 
         async function backupContainer(id) {
