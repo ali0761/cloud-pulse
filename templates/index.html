@@ -402,28 +402,38 @@
             }
         }
 
+        function colorizeLog(line) {
+            let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            safeLine = safeLine.replace(/\b(ERROR|FATAL|ERR|Exception|Failed)\b/gi, '<span class="text-danger fw-bold">$1</span>');
+            safeLine = safeLine.replace(/\b(WARNING|WARN)\b/gi, '<span class="text-warning fw-bold">$1</span>');
+            safeLine = safeLine.replace(/\b(INFO|NOTICE)\b/gi, '<span class="text-info fw-bold">$1</span>');
+            safeLine = safeLine.replace(/\b(DEBUG|TRACE)\b/gi, '<span class="text-secondary fw-bold">$1</span>');
+            safeLine = safeLine.replace(/\b(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)\b/g, '<span class="text-success">$1</span>');
+            return safeLine;
+        }
+
         function filterLogs(scrollDown = true) {
             const keyword = document.getElementById('logSearchInput').value.toLowerCase();
             const outBox = document.getElementById('logsOutput');
             
-            if(!keyword) {
-                outBox.innerText = rawLogsData;
+            let lines = rawLogsData.split('\n');
+            if (keyword) {
+                lines = lines.filter(l => l.toLowerCase().includes(keyword));
+            }
+            
+            if (lines.length === 0) {
+                outBox.innerHTML = "<i class='text-muted'>Bu arama kelimesine uygun log bulunamadı veya log boş.</i>";
             } else {
-                const lines = rawLogsData.split('\n');
-                const filtered = lines.filter(l => l.toLowerCase().includes(keyword));
-                
-                // Vurgulama
-                const highlighted = filtered.map(l => {
-                    // Güvenli regex
-                    const regex = new RegExp(`(${keyword.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')})`, 'gi');
-                    return l.replace(regex, '<span class="log-highlight">$1</span>');
+                let htmlLines = lines.map(l => {
+                    let colored = colorizeLog(l);
+                    if (keyword) {
+                        const regex = new RegExp(`(${keyword.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')})`, 'gi');
+                        // Vurgulamak için geçici bir arka plan atıyoruz
+                        colored = colored.replace(regex, '<span class="bg-warning text-dark px-1 rounded">$1</span>');
+                    }
+                    return colored;
                 });
-                
-                if (highlighted.length === 0) {
-                    outBox.innerHTML = "<i class='text-muted'>Bu arama kelimesine uygun log bulunamadı.</i>";
-                } else {
-                    outBox.innerHTML = highlighted.join('<br>');
-                }
+                outBox.innerHTML = htmlLines.join('<br>');
             }
             if(scrollDown) {
                 outBox.scrollTop = outBox.scrollHeight;
@@ -443,7 +453,11 @@
         }
 
         function openMainTerminal() {
-            if (mainContainerId) openTerminal(mainContainerId, 'devops-monitor (Ana Sistem)');
+            currentContainerId = 'system';
+            document.getElementById('terminalTitle').innerText = `💻 Ana Terminal (CloudPulse Motoru)`;
+            document.getElementById('terminalOutput').innerText = `CloudPulse Ana Sistemine Bağlanıldı. Hazır.\n\n`;
+            new bootstrap.Modal(document.getElementById('terminalModal')).show();
+            setTimeout(() => document.getElementById('cmdInput').focus(), 500);
         }
 
         async function executeCommand(e) {
@@ -453,10 +467,11 @@
             if (!cmd || !currentContainerId) return;
 
             const outBox = document.getElementById('terminalOutput');
-            outBox.innerText += `root@docker:~# ${cmd}\n`;
+            outBox.innerText += `root@cloudpulse:~# ${cmd}\n`;
             input.value = '';
             try {
-                const res = await fetch(`/api/containers/${currentContainerId}/exec`, {
+                let url = currentContainerId === 'system' ? '/api/system/exec' : `/api/containers/${currentContainerId}/exec`;
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ command: cmd })
@@ -647,12 +662,13 @@
                     ` : '';
 
                     // Stats string
-                    let statsStr = isUp ? `CPU: %${c.stats.cpu} | RAM: %${c.stats.ram_percent} <span class="text-muted small">(${c.stats.ram_mb} MB)</span>` : `<span class="text-muted">-</span>`;
+                    let statsStr = isUp ? `CPU: %${c.stats.cpu} | RAM: %${c.stats.ram_percent} <span class="opacity-75 small">(${c.stats.ram_mb} MB)</span>` : `<span class="opacity-50">-</span>`;
 
                     tbody.innerHTML += `
                         <tr>
-                            <td class="fw-bold small">${c.name}</td>
                             <td><span class="badge ${badgeClass}">${c.status}</span></td>
+                            <td class="fw-bold small" style="color: var(--text-color);">${c.name}</td>
+                            <td class="small opacity-75">${c.image}</td>
                             <td style="font-size: 0.85rem;">${statsStr}</td>
                             <td>
                                 <div class="dropdown">
@@ -660,7 +676,7 @@
                                         ⚡ İşlem
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-dark">
-                                        <li><a class="dropdown-item text-secondary fw-bold" href="#" onclick="openLogs('${c.id}', '${c.name}')">📄 Logları Gör</a></li>
+                                        <li><a class="dropdown-item text-info fw-bold" href="#" onclick="openLogs('${c.id}', '${c.name}')">📄 Logları Gör</a></li>
                                         ${adminActions}
                                     </ul>
                                 </div>

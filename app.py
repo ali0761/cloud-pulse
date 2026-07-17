@@ -281,6 +281,23 @@ def execute_command(pod_name):
     except Exception as e:
         return jsonify({"status": "error", "output": f"Hata: {str(e)}"})
 
+@app.route('/api/system/exec', methods=['POST'])
+@login_required
+@admin_required
+def execute_system_command():
+    try:
+        data = request.get_json()
+        cmd = data.get('command', '')
+        if not cmd:
+            return jsonify({"status": "error", "output": "Geçersiz komut."})
+
+        output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True, timeout=15)
+        return jsonify({"status": "success", "output": output})
+    except subprocess.CalledProcessError as e:
+        return jsonify({"status": "error", "output": str(e.output)})
+    except Exception as e:
+        return jsonify({"status": "error", "output": f"Hata: {str(e)}"})
+
 @app.route('/api/containers/<pod_name>/limit', methods=['POST'])
 @login_required
 @admin_required
