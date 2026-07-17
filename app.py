@@ -349,11 +349,15 @@ def run_compose():
             send_telegram_alert("compose", f"📦 *YENİ COMPOSE BAŞLATILDI*\n\nToplu servis kurulumu tamamlandı.", force=True)
             return jsonify({"status": "success", "message": "Docker Compose başarıyla başlatıldı!"})
         else:
-            # Alternatif olarak docker-compose komutunu dene (Eski sürümler)
-            res2 = subprocess.run(["docker-compose", "up", "-d"], cwd=compose_dir, capture_output=True, text=True)
-            if res2.returncode == 0:
-                return jsonify({"status": "success", "message": "Docker Compose başarıyla başlatıldı!"})
-            return jsonify({"status": "error", "message": f"Hata: {result.stderr or res2.stderr}"}), 500
+            try:
+                # Alternatif olarak docker-compose komutunu dene (Eski sürümler)
+                res2 = subprocess.run(["docker-compose", "up", "-d"], cwd=compose_dir, capture_output=True, text=True)
+                if res2.returncode == 0:
+                    return jsonify({"status": "success", "message": "Docker Compose başarıyla başlatıldı!"})
+                return jsonify({"status": "error", "message": f"Hata: {res2.stderr}"}), 500
+            except FileNotFoundError:
+                # Eğer eski sürüm (docker-compose) yoksa, ilk hatayı döndür
+                return jsonify({"status": "error", "message": f"Hata: {result.stderr}"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
