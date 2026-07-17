@@ -61,6 +61,23 @@ def get_k8s_client():
             config.load_kube_config()
     return client.CoreV1Api(), client.AppsV1Api(), client.CustomObjectsApi()
 
+def background_db_worker():
+    while True:
+        try:
+            cpu_percent = psutil.cpu_percent(interval=0.5)
+            memory = psutil.virtual_memory()
+            mem_percent = memory.percent
+            
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            c.execute("INSERT INTO stats_history (cpu, ram) VALUES (?, ?)", (cpu_percent, mem_percent))
+            c.execute("DELETE FROM stats_history WHERE timestamp <= datetime('now', '-7 days')")
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            pass
+        time.sleep(3)
+
 pod_stats_cache = {}
 
 def background_container_stats_worker():
@@ -90,6 +107,7 @@ def background_container_stats_worker():
         time.sleep(5)
 
 init_db()
+threading.Thread(target=background_db_worker, daemon=True).start()
 threading.Thread(target=background_container_stats_worker, daemon=True).start()
 
 def send_telegram_alert(alert_key, message, force=False):
@@ -123,6 +141,29 @@ def login():
 @login_required
 def index():
     return render_template('index.html', role=session.get('role', 'viewer'))
+
+@app.route('/api/stats')
+@login_required
+def get_stats():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT timestamp, cpu, ram FROM stats_history ORDER BY id DESC LIMIT 60")
+    rows = c.fetchall()
+    conn.close()
+
+    timestamps = []
+    cpu_data = []
+    ram_data = []
+    for row in reversed(rows):
+        timestamps.append(row[0].split(" ")[1])
+        cpu_data.append(row[1])
+        ram_data.append(row[2])
+
+    return jsonify({
+        "timestamps": timestamps,
+        "cpu": cpu_data,
+        "ram": ram_data
+    })
 
 @app.route('/api/containers')
 @login_required
