@@ -212,13 +212,22 @@ def get_containers():
     except Exception as e:
         return jsonify({"error": str(e), "containers": []})
 
+def get_pod_namespace(core_api, pod_name):
+    try:
+        pods = core_api.list_pod_for_all_namespaces(field_selector=f"metadata.name={pod_name}").items
+        if pods:
+            return pods[0].metadata.namespace
+    except:
+        pass
+    return "default"
+
 @app.route('/api/containers/<pod_name>/<action>', methods=['POST'])
 @login_required
 @admin_required
 def manage_container(pod_name, action):
     try:
         core_api, apps_api, _ = get_k8s_client()
-        namespace = "default"
+        namespace = get_pod_namespace(core_api, pod_name)
         
         pod = core_api.read_namespaced_pod(name=pod_name, namespace=namespace)
         owner_name = None
@@ -260,10 +269,11 @@ def execute_command(pod_name):
             return jsonify({"status": "error", "output": "Geçersiz komut."})
 
         core_api, _, _ = get_k8s_client()
+        namespace = get_pod_namespace(core_api, pod_name)
         exec_command = ['/bin/sh', '-c', cmd]
         resp = stream(core_api.connect_get_namespaced_pod_exec,
                       pod_name,
-                      'default',
+                      namespace,
                       command=exec_command,
                       stderr=True, stdin=False,
                       stdout=True, tty=False)
@@ -279,8 +289,9 @@ def set_limit(pod_name):
         data = request.get_json()
         limit_mb = data.get('mem_limit_mb')
         core_api, apps_api, _ = get_k8s_client()
+        namespace = get_pod_namespace(core_api, pod_name)
         
-        pod = core_api.read_namespaced_pod(name=pod_name, namespace="default")
+        pod = core_api.read_namespaced_pod(name=pod_name, namespace=namespace)
         container_name = pod.spec.containers[0].name
         owner_name = None
         if pod.metadata.owner_references and pod.metadata.owner_references[0].kind == "ReplicaSet":
@@ -303,7 +314,7 @@ def set_limit(pod_name):
                 }
             }
         }
-        apps_api.patch_namespaced_deployment(name=owner_name, namespace="default", body=patch)
+        apps_api.patch_namespaced_deployment(name=owner_name, namespace=namespace, body=patch)
         return jsonify({"status": "success", "message": f"RAM Limiti {limit_mb}MB yapıldı!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -340,7 +351,8 @@ def deploy_container():
 def get_container_logs(pod_name):
     try:
         core_api, apps_api, _ = get_k8s_client()
-        logs = core_api.read_namespaced_pod_log(name=pod_name, namespace="default", tail_lines=500)
+        namespace = get_pod_namespace(core_api, pod_name)
+        logs = core_api.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=500)
         return jsonify({"status": "success", "logs": logs})
     except Exception as e:
         return jsonify({"status": "error", "logs": f"Sistem Hatası (veya K8s hazır değil): {str(e)}"}), 500
