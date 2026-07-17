@@ -52,6 +52,12 @@ def get_k8s_client():
     except:
         try:
             config.load_kube_config(config_file="/etc/rancher/k3s/k3s.yaml")
+            # Docker konteyneri içinden host sunucusundaki K3s API'sine ulaşmak için:
+            conf = client.Configuration.get_default_copy()
+            if "127.0.0.1" in conf.host:
+                conf.host = conf.host.replace("127.0.0.1", "10.0.0.66")
+            conf.verify_ssl = False # İç ağda SSL takılmalarını önlemek için
+            client.Configuration.set_default(conf)
         except:
             config.load_kube_config()
     return client.CoreV1Api(), client.AppsV1Api(), client.CustomObjectsApi()
