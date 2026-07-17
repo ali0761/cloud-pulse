@@ -52,11 +52,10 @@ def get_k8s_client():
     except:
         try:
             config.load_kube_config(config_file="/etc/rancher/k3s/k3s.yaml")
-            # Docker konteyneri içinden host sunucusundaki K3s API'sine ulaşmak için:
             conf = client.Configuration.get_default_copy()
-            if "127.0.0.1" in conf.host:
-                conf.host = conf.host.replace("127.0.0.1", "host.docker.internal")
-            conf.verify_ssl = False # İç ağda SSL takılmalarını önlemek için
+            # Kesin olarak host'un gerçek IP'sine (10.0.0.66) yönlendir
+            conf.host = "https://10.0.0.66:6443"
+            conf.verify_ssl = False
             client.Configuration.set_default(conf)
         except:
             config.load_kube_config()
@@ -130,7 +129,8 @@ def index():
 def get_containers():
     try:
         core_api, apps_api, _ = get_k8s_client()
-        pods = core_api.list_pod_for_all_namespaces().items
+        # API'nin sonsuza kadar takılmasını önlemek için 3 saniye zaman aşımı (timeout) ekledik
+        pods = core_api.list_pod_for_all_namespaces(_request_timeout=3).items
         
         containers = []
         for pod in pods:
