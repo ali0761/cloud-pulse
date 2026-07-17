@@ -585,6 +585,10 @@
                                 <div class="col-md-3 col-sm-6" id="chart-card-${c.id}">
                                     <div class="card p-2 h-100 border-secondary">
                                         <h6 class="text-center text-truncate small mb-1 mt-1 text-info font-monospace">${c.name}</h6>
+                                        <div class="d-flex justify-content-between px-1 mb-1 fw-bold" style="font-size: 0.75rem;">
+                                            <span style="color: #38bdf8;">■ CPU: <span id="chart-cpu-${c.id}">%${c.stats.cpu}</span></span>
+                                            <span style="color: #818cf8;">■ RAM: <span id="chart-ram-${c.id}">%${c.stats.ram_percent}</span></span>
+                                        </div>
                                         <div style="height: 100px; width: 100%;">
                                             <canvas id="chart-canvas-${c.id}"></canvas>
                                         </div>
@@ -612,6 +616,8 @@
                                 }
                             });
                         } else {
+                            document.getElementById('chart-cpu-' + c.id).innerText = '%' + c.stats.cpu;
+                            document.getElementById('chart-ram-' + c.id).innerText = '%' + c.stats.ram_percent;
                             containerCharts[c.id].update();
                         }
                     }
