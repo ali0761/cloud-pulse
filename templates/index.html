@@ -626,13 +626,12 @@
                     const adminActions = userRole === 'admin' ? `
                         ${isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li>` : ''}
                         <li><a class="dropdown-item text-primary" href="#" onclick="setLimit('${c.id}')">⚖️ RAM Limiti Koy</a></li>
-                        <li><a class="dropdown-item text-success fw-bold" href="#" onclick="backupContainer('${c.id}')">💾 SQL Yedeği Al</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-success" href="#" onclick="manageAction('${c.id}', 'start')">▶️ Başlat</a></li>
-                        <li><a class="dropdown-item text-warning" href="#" onclick="manageAction('${c.id}', 'restart')">🔄 Yeniden Başlat</a></li>
-                        <li><a class="dropdown-item text-danger" href="#" onclick="manageAction('${c.id}', 'stop')">⏸️ Durdur</a></li>
+                        <li><a class="dropdown-item text-success" href="#" onclick="manageAction('${c.id}', 'start')">▶️ Başlat (Scale 1)</a></li>
+                        <li><a class="dropdown-item text-warning" href="#" onclick="manageAction('${c.id}', 'restart')">🔄 Yeniden Başlat (Recreate)</a></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="manageAction('${c.id}', 'stop')">⏸️ Durdur (Scale 0)</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Sil (Kaldır)</a></li>
+                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Sil (Pod Kaldır)</a></li>
                     ` : '';
 
                     // Stats string

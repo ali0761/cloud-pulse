@@ -13,6 +13,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # Kubernetes Kütüphanesi
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
+from kubernetes.stream import stream
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "cloudpulse-super-gizli-2026-devops-key")
@@ -219,11 +220,91 @@ def manage_container(pod_name, action):
         core_api, apps_api, _ = get_k8s_client()
         namespace = "default"
         
-        if action == "delete":
+        pod = core_api.read_namespaced_pod(name=pod_name, namespace=namespace)
+        owner_name = None
+        if pod.metadata.owner_references and pod.metadata.owner_references[0].kind == "ReplicaSet":
+            owner_name = "-".join(pod.metadata.owner_references[0].name.split("-")[:-1])
+        
+        if action == "delete" or action == "restart":
             core_api.delete_namespaced_pod(name=pod_name, namespace=namespace)
-            return jsonify({"status": "success", "message": f"Pod başarıyla silindi!"})
+            return jsonify({"status": "success", "message": f"Pod {action} tetiklendi. (K8s yenisini başlatacak)"})
+            
+        elif action == "stop":
+            if not owner_name:
+                return jsonify({"status": "error", "message": "Bu bağımsız bir Pod, durdurulamaz!"}), 400
+            patch = {"spec": {"replicas": 0}}
+            apps_api.patch_namespaced_deployment(name=owner_name, namespace=namespace, body=patch)
+            return jsonify({"status": "success", "message": f"{owner_name} durduruldu (Scale 0)!"})
+            
+        elif action == "start":
+            if not owner_name:
+                return jsonify({"status": "error", "message": "Bu bağımsız bir Pod, başlatılamaz!"}), 400
+            patch = {"spec": {"replicas": 1}}
+            apps_api.patch_namespaced_deployment(name=owner_name, namespace=namespace, body=patch)
+            return jsonify({"status": "success", "message": f"{owner_name} başlatıldı (Scale 1)!"})
+            
         else:
-            return jsonify({"status": "error", "message": "K8s'de Podlar Deployment üzerinden yönetilir. Bu işlem K8s'e uygun değil."}), 400
+            return jsonify({"status": "error", "message": "Geçersiz işlem!"}), 400
+            
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/containers/<pod_name>/exec', methods=['POST'])
+@login_required
+@admin_required
+def execute_command(pod_name):
+    try:
+        data = request.get_json()
+        cmd = data.get('command', '')
+        if not cmd:
+            return jsonify({"status": "error", "output": "Geçersiz komut."})
+
+        core_api, _, _ = get_k8s_client()
+        exec_command = ['/bin/sh', '-c', cmd]
+        resp = stream(core_api.connect_get_namespaced_pod_exec,
+                      pod_name,
+                      'default',
+                      command=exec_command,
+                      stderr=True, stdin=False,
+                      stdout=True, tty=False)
+        return jsonify({"status": "success", "output": resp})
+    except Exception as e:
+        return jsonify({"status": "error", "output": f"Hata: {str(e)}"})
+
+@app.route('/api/containers/<pod_name>/limit', methods=['POST'])
+@login_required
+@admin_required
+def set_limit(pod_name):
+    try:
+        data = request.get_json()
+        limit_mb = data.get('mem_limit_mb')
+        core_api, apps_api, _ = get_k8s_client()
+        
+        pod = core_api.read_namespaced_pod(name=pod_name, namespace="default")
+        container_name = pod.spec.containers[0].name
+        owner_name = None
+        if pod.metadata.owner_references and pod.metadata.owner_references[0].kind == "ReplicaSet":
+            owner_name = "-".join(pod.metadata.owner_references[0].name.split("-")[:-1])
+            
+        if not owner_name:
+            return jsonify({"status": "error", "message": "Deployment bulunamadı!"}), 400
+            
+        patch = {
+            "spec": {
+                "template": {
+                    "spec": {
+                        "containers": [{
+                            "name": container_name,
+                            "resources": {
+                                "limits": {"memory": f"{limit_mb}Mi"}
+                            }
+                        }]
+                    }
+                }
+            }
+        }
+        apps_api.patch_namespaced_deployment(name=owner_name, namespace="default", body=patch)
+        return jsonify({"status": "success", "message": f"RAM Limiti {limit_mb}MB yapıldı!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
