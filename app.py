@@ -326,7 +326,13 @@ def deploy_container():
     try:
         data = request.get_json()
         image = data.get('image', '').strip()
-        name = data.get('name', 'new-app').strip()
+        name = data.get('name', '').strip()
+        
+        if not name:
+            import uuid
+            # İsim boş bırakıldıysa imaj adından (Örn: nginx:latest -> nginx) ve rastgele id'den isim üret
+            safe_image = image.split(':')[0].replace('/', '-')
+            name = f"{safe_image}-{uuid.uuid4().hex[:5]}"
 
         core_api, apps_api, _ = get_k8s_client()
         
