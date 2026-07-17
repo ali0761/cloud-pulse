@@ -37,6 +37,7 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/rancher/k3s/k3s.yaml:/etc/rancher/k3s/k3s.yaml:ro
     environment:
       # Nginx ve SSL robotuna "Bu konteyneri bu alan adına bağla" diyen sihirli komutlar:
       - VIRTUAL_HOST=cloudpulse-ali.duckdns.org

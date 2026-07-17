@@ -125,15 +125,16 @@
             <div class="col-md-7">
                 <div class="card p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">🐳 Docker Servisleri</h5>
+                        <h5 class="mb-0">🔥 Kubernetes Servisleri (Pods)</h5>
                         <button class="btn btn-sm btn-outline-info" onclick="fetchContainers()">Yenile</button>
                     </div>
-                    <div class="table-responsive flex-grow-1" style="max-height: 350px; overflow-y: auto;">
-                        <table class="table table-hover align-middle" style="font-size: 0.9rem;">
-                            <thead>
+                    <div class="table-responsive bg-white rounded shadow-sm" style="max-height: 350px; overflow-y: auto;">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
+                            <thead class="table-dark">
                                 <tr>
-                                    <th>İsim</th>
                                     <th>Durum</th>
+                                    <th>Pod Adı</th>
+                                    <th>İmaj</th>
                                     <th>Kaynaklar (CPU/RAM)</th>
                                     <th>İşlem</th>
                                 </tr>
