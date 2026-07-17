@@ -55,7 +55,7 @@ def get_k8s_client():
             # Docker konteyneri içinden host sunucusundaki K3s API'sine ulaşmak için:
             conf = client.Configuration.get_default_copy()
             if "127.0.0.1" in conf.host:
-                conf.host = conf.host.replace("127.0.0.1", "10.0.0.66")
+                conf.host = conf.host.replace("127.0.0.1", "host.docker.internal")
             conf.verify_ssl = False # İç ağda SSL takılmalarını önlemek için
             client.Configuration.set_default(conf)
         except:
