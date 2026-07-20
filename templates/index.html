@@ -655,11 +655,10 @@
                         ${isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li>` : ''}
                         <li><a class="dropdown-item text-primary" href="#" onclick="setLimit('${c.id}')">⚖️ RAM Limiti Koy</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-success" href="#" onclick="manageAction('${c.id}', 'start')">▶️ Başlat (Scale 1)</a></li>
-                        <li><a class="dropdown-item text-warning" href="#" onclick="manageAction('${c.id}', 'restart')">🔄 Yeniden Başlat (Recreate)</a></li>
-                        <li><a class="dropdown-item text-danger" href="#" onclick="manageAction('${c.id}', 'stop')">⏸️ Durdur (Scale 0)</a></li>
+                        <li><a class="dropdown-item text-warning" href="#" onclick="scaleAction('${c.id}')">⚖️ Çoğalt/Azalt (Scale)</a></li>
+                        <li><a class="dropdown-item text-info" href="#" onclick="manageAction('${c.id}', 'restart')">♻️ Podu Yeniden Başlat</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Sil (Pod Kaldır)</a></li>
+                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Podu Sil (Yenisi Açılır)</a></li>
                     ` : '';
 
                     // Stats string
@@ -699,9 +698,25 @@
         }
 
         async function manageAction(id, action) {
-            if (action === 'delete' && !confirm("Silmek istediğinize emin misiniz?")) return;
+            if (action === 'delete' && !confirm("Pod'u silmek istediğinize emin misiniz? (Kubernetes hemen yenisini başlatabilir)")) return;
             try {
                 const res = await fetch(`/api/containers/${id}/${action}`, { method: 'POST' });
+                const data = await res.json();
+                showAlert(data.message, res.ok ? "success" : "danger");
+                fetchContainers();
+            } catch (e) { showAlert("Hata oluştu!", "danger"); }
+        }
+
+        async function scaleAction(id) {
+            const replicas = prompt("Bu uygulamadan kaç kopya çalıştırmak istiyorsunuz? (Örn: 3, 1 veya tamamen kapatmak için 0):", "1");
+            if (replicas === null || replicas.trim() === "") return;
+            
+            try {
+                const res = await fetch(`/api/containers/${id}/scale`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ replicas: parseInt(replicas) })
+                });
                 const data = await res.json();
                 showAlert(data.message, res.ok ? "success" : "danger");
                 fetchContainers();

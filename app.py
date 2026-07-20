@@ -244,21 +244,22 @@ def manage_container(pod_name, action):
         
         if action == "delete" or action == "restart":
             core_api.delete_namespaced_pod(name=pod_name, namespace=namespace)
-            return jsonify({"status": "success", "message": f"Pod {action} tetiklendi. (K8s yenisini başlatacak)"})
+            msg = "Pod silindi. (K8s otomatik yenisini açacak)" if action == "delete" else "Pod yeniden başlatılıyor..."
+            return jsonify({"status": "success", "message": msg})
             
-        elif action == "stop":
+        elif action == "scale":
             if not owner_name:
-                return jsonify({"status": "error", "message": "Bu bağımsız bir Pod, durdurulamaz!"}), 400
-            patch = {"spec": {"replicas": 0}}
-            apps_api.patch_namespaced_deployment(name=owner_name, namespace=namespace, body=patch)
-            return jsonify({"status": "success", "message": f"{owner_name} durduruldu (Scale 0)!"})
+                return jsonify({"status": "error", "message": "Bu bağımsız bir Pod, ölçeklenemez (Scale edilemez)!"}), 400
             
-        elif action == "start":
-            if not owner_name:
-                return jsonify({"status": "error", "message": "Bu bağımsız bir Pod, başlatılamaz!"}), 400
-            patch = {"spec": {"replicas": 1}}
+            data = request.get_json() or {}
+            try:
+                replicas = int(data.get("replicas", 1))
+            except:
+                replicas = 1
+                
+            patch = {"spec": {"replicas": replicas}}
             apps_api.patch_namespaced_deployment(name=owner_name, namespace=namespace, body=patch)
-            return jsonify({"status": "success", "message": f"{owner_name} başlatıldı (Scale 1)!"})
+            return jsonify({"status": "success", "message": f"{owner_name} başarıyla {replicas} kopyaya ayarlandı!"})
             
         else:
             return jsonify({"status": "error", "message": "Geçersiz işlem!"}), 400
