@@ -207,18 +207,25 @@ def get_containers():
         
         containers = []
         for pod in pods:
-            # Sadece default ve kube-system ayırımı yapabiliriz ama genel listeliyoruz.
             status = pod.status.phase
             name = pod.metadata.name
+            namespace = pod.metadata.namespace
             image = pod.spec.containers[0].image if pod.spec.containers else "bilinmiyor"
             c_stats = pod_stats_cache.get(name, {"cpu": 0.0, "ram_percent": 0.0, "ram_mb": 0.0})
             
+            is_system = False
+            if namespace in ["kube-system", "kube-public", "kube-node-lease"]:
+                is_system = True
+            elif name.startswith("svclb-") or name.startswith("traefik") or name.startswith("coredns") or name.startswith("local-path") or name.startswith("metrics-server"):
+                is_system = True
+                
             containers.append({
                 "id": pod.metadata.name,
                 "name": name,
                 "status": status,
                 "image": image,
-                "stats": c_stats
+                "stats": c_stats,
+                "pod_type": "system" if is_system else "user"
             })
         return jsonify({"containers": containers})
     except Exception as e:
