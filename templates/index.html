@@ -45,44 +45,44 @@
     <!-- Üst Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark mb-4 rounded px-3">
         <div class="container-fluid">
-            <span class="navbar-brand fw-bold text-light"><span class="text-info fs-4 me-1">⚡</span>Kube<span class="text-warning">Pulse</span> <small class="text-muted fs-6 ms-2">| DevOps Kontrol Paneli [v4.0]</small></span>
+            <span class="navbar-brand fw-bold text-light">Kube<span class="text-warning">Pulse</span> <small class="text-muted fs-6 ms-2">| DevOps Kontrol Paneli</small></span>
             <div class="d-flex align-items-center">
-                <span class="badge bg-success me-3" id="roleBadge">🟢 Canlı</span>
+                <button class="btn btn-sm btn-success me-3 fw-bold disabled" id="roleBadge" style="opacity: 1;">Canlı</button>
 
                 <button onclick="toggleTheme()" class="btn btn-sm btn-outline-warning fw-bold me-3" id="themeBtn">
-                    ☀️ Gündüz
+                    Gündüz
                 </button>
 
                 <!-- 🔔 ALARMLAR BUTONU -->
                 <button onclick="openAlertsModal()" class="btn btn-sm btn-outline-danger fw-bold me-3 position-relative">
-                    🔔 Bildirimler
+                    Bildirimler
                 </button>
 
                 <!-- 🛠️ ARAÇLAR DROPDOWN -->
                 <div class="dropdown me-3 dropdown-hover">
                     <button class="btn btn-sm btn-outline-info dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
-                        🛠️ Araçlar
+                        Araçlar
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark shadow-lg">
-                        <li><a class="dropdown-item fw-bold" href="#" onclick="openHistoryModal()">📊 Sistem Geçmişi</a></li>
+                        <li><a class="dropdown-item fw-bold" href="#" onclick="openHistoryModal()">Sistem Geçmişi</a></li>
                         <li><hr class="dropdown-divider admin-only d-none"></li>
-                        <li><a class="dropdown-item text-primary fw-bold admin-only d-none" href="#" onclick="openDeployModal()">🚀 Yeni Servis Kur</a></li>
-                        <li><a class="dropdown-item text-light fw-bold admin-only d-none" href="#" onclick="openComposeModal()">📦 K8s YAML Kur</a></li>
-                        <li><a class="dropdown-item text-success font-monospace fw-bold admin-only d-none" href="#" onclick="openMainTerminal()">💻 Ana Terminal</a></li>
+                        <li><a class="dropdown-item text-primary fw-bold admin-only d-none" href="#" onclick="openDeployModal()">Yeni Servis Kur</a></li>
+                        <li><a class="dropdown-item text-light fw-bold admin-only d-none" href="#" onclick="openComposeModal()">K8s YAML Kur</a></li>
+                        <li><a class="dropdown-item text-success font-monospace fw-bold admin-only d-none" href="#" onclick="openMainTerminal()">Ana Terminal</a></li>
                     </ul>
                 </div>
 
                 <!-- Ayarlar -->
                 <div class="dropdown me-3 admin-only d-none">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        ⚙️
+                        ⚙️ Ayarlar
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
-                        <li><a class="dropdown-item text-info" href="#" onclick="testTelegram()">📱 Telegram Testi</a></li>
+                        <li><a class="dropdown-item text-info" href="#" onclick="testTelegram()">Telegram Testi</a></li>
                     </ul>
                 </div>
 
-                <a href="/logout" class="btn btn-sm btn-outline-danger fw-bold">🔒 Çıkış</a>
+                <a href="/logout" class="btn btn-sm btn-outline-danger fw-bold">Çıkış</a>
             </div>
         </div>
     </nav>
