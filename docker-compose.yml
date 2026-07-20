@@ -50,6 +50,16 @@ services:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
 
+  # 4. KUBERNETES KÖPRÜSÜ (MARIO İÇİN)
+  k8s-proxy:
+    image: alpine/socat
+    container_name: k8s-proxy
+    command: tcp-listen:80,fork,reuseaddr tcp-connect:10.0.0.66:8090
+    environment:
+      - VIRTUAL_HOST=mario-ali.duckdns.org
+      - LETSENCRYPT_HOST=mario-ali.duckdns.org
+    restart: always
+
 volumes:
   conf:
   vhost:
