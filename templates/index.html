@@ -68,7 +68,6 @@
                         <li><hr class="dropdown-divider admin-only d-none"></li>
                         <li><a class="dropdown-item text-primary fw-bold admin-only d-none" href="#" onclick="openDeployModal()">🚀 Yeni Servis Kur</a></li>
                         <li><a class="dropdown-item text-light fw-bold admin-only d-none" href="#" onclick="openComposeModal()">📦 K8s YAML Kur</a></li>
-                        <li><a class="dropdown-item text-warning fw-bold admin-only d-none" href="#" onclick="openImagesModal()">🧹 İmajlar & Temizlik</a></li>
                         <li><a class="dropdown-item text-success font-monospace fw-bold admin-only d-none" href="#" onclick="openMainTerminal()">💻 Ana Terminal</a></li>
                     </ul>
                 </div>
@@ -294,26 +293,6 @@
         </div>
     </div>
 
-    <!-- 🧹 İMAJ YÖNETİMİ MODAL -->
-    <div class="modal fade" id="imagesModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content border-secondary" style="background-color: var(--card-bg); color: var(--text-color);">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title fw-bold">🧹 İmaj Yönetimi ve Disk Temizliği</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="d-flex justify-content-between mb-3">
-                        <h6>Sistemdeki İmajlar</h6>
-                        <button class="btn btn-sm btn-danger fw-bold" onclick="pruneImages()">🗑️ Kullanılmayanları Sil (Prune)</button>
-                    </div>
-                    <ul class="list-group" id="imagesList">
-                        <li class="list-group-item text-center text-muted" style="background-color: var(--bg-color);">Yükleniyor...</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -798,33 +777,6 @@
                         </li>`;
                     });
                 }
-            } catch(e) {}
-        }
-
-        async function openImagesModal() {
-            new bootstrap.Modal(document.getElementById('imagesModal')).show();
-            const ul = document.getElementById('imagesList');
-            ul.innerHTML = '<li class="list-group-item text-center text-muted">Yükleniyor...</li>';
-            try {
-                const res = await fetch('/api/images');
-                const data = await res.json();
-                ul.innerHTML = '';
-                data.images.forEach(img => {
-                    ul.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center" style="background-color: var(--bg-color); color: var(--text-color);">
-                        <span class="font-monospace">${img.tag}</span><span class="badge bg-secondary rounded-pill">${img.size_mb} MB</span>
-                    </li>`;
-                });
-            } catch(e) {}
-        }
-
-        async function pruneImages() {
-            if(!confirm("Kullanılmayan imajlar silinecek. Emin misiniz?")) return;
-            try {
-                showAlert("Disk temizleniyor...", "info");
-                const res = await fetch('/api/system/prune', { method: 'POST' });
-                const data = await res.json();
-                showAlert(data.message, res.ok ? "success" : "danger");
-                openImagesModal();
             } catch(e) {}
         }
 

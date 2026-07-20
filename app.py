@@ -136,6 +136,10 @@ def login():
             session['logged_in'] = True
             session['role'] = 'admin'
             return redirect(url_for('index'))
+        elif request.form['username'] == VIEWER_USER and check_password_hash(VIEWER_PASS_HASH, request.form['password']):
+            session['logged_in'] = True
+            session['role'] = 'viewer'
+            return redirect(url_for('index'))
         else:
             error = 'Geçersiz kullanıcı adı veya şifre.'
     return render_template('login.html', error=error)
