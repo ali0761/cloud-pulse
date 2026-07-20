@@ -103,6 +103,9 @@ def background_container_stats_worker():
                     "ram_percent": round((mem_mb / 24000.0) * 100, 2), # Varsayılan RAM oranlaması (Örn: 24GB)
                     "ram_mb": round(mem_mb, 2)
                 }
+
+                if cpu_percent > 90.0:
+                    send_telegram_alert(f"cpu_pod_{pod_name}", f"DİKKAT! {pod_name} podu %90'ın üzerinde CPU kullanıyor! Mevcut: %{round(cpu_percent, 2)}")
         except Exception as e:
             pass
         time.sleep(5)
@@ -111,8 +114,31 @@ init_db()
 threading.Thread(target=background_db_worker, daemon=True).start()
 threading.Thread(target=background_container_stats_worker, daemon=True).start()
 
+last_alert_times = {}
 def send_telegram_alert(alert_key, message, force=False):
-    pass # Aynı mantık (kısaltıldı)
+    global last_alert_times
+    now = time.time()
+    if not force:
+        if alert_key in last_alert_times and (now - last_alert_times[alert_key]) < 300: # 5 dk içinde tekrar atma
+            return
+    last_alert_times[alert_key] = now
+
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("INSERT INTO alerts_history (message) VALUES (?)", (message,))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+    try:
+        req_lib.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": f"KubePulse Alarm:\n{message}"
+        }, timeout=2)
+    except:
+        pass
 
 def login_required(f):
     @wraps(f)
@@ -453,6 +479,30 @@ def deploy_container():
             return jsonify({"status": "success", "message": f"{image} başarıyla başlatıldı ve Dışarıya {external_port} portundan açıldı!"})
 
         return jsonify({"status": "success", "message": f"{image} başarıyla Deployment olarak başlatıldı!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/alerts', methods=['GET'])
+@login_required
+def get_alerts():
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, message FROM alerts_history ORDER BY id DESC LIMIT 50")
+        rows = c.fetchall()
+        conn.close()
+        alerts = [{"time": r[0], "message": r[1]} for r in rows]
+        return jsonify({"status": "success", "alerts": alerts})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/test-telegram', methods=['POST'])
+@login_required
+@admin_required
+def test_telegram_api():
+    try:
+        send_telegram_alert("test_alert", "Bu bir KubePulse test bildirimidir! 🚀", force=True)
+        return jsonify({"status": "success", "message": "Test mesajı Telegram'a gönderildi!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

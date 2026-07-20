@@ -635,13 +635,13 @@
                     const badgeClass = isUp ? 'bg-success' : (c.status === 'Pending' ? 'bg-warning text-dark' : 'bg-danger');
 
                     const adminActions = userRole === 'admin' ? `
-                        ${isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">💻 Terminal (Exec)</a></li>` : ''}
-                        <li><a class="dropdown-item text-primary" href="#" onclick="setLimit('${c.id}')">⚖️ RAM Limiti Koy</a></li>
+                        ${isUp ? `<li><a class="dropdown-item text-info font-monospace fw-bold" href="#" onclick="openTerminal('${c.id}', '${c.name}')">Terminal (Exec)</a></li>` : ''}
+                        <li><a class="dropdown-item text-primary" href="#" onclick="setLimit('${c.id}')">RAM Limiti Koy</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-warning" href="#" onclick="scaleAction('${c.id}')">⚖️ Çoğalt/Azalt (Scale)</a></li>
-                        <li><a class="dropdown-item text-info" href="#" onclick="manageAction('${c.id}', 'restart')">♻️ Podu Yeniden Başlat</a></li>
+                        <li><a class="dropdown-item text-warning" href="#" onclick="scaleAction('${c.id}')">Çoğalt/Azalt (Scale)</a></li>
+                        <li><a class="dropdown-item text-info" href="#" onclick="manageAction('${c.id}', 'restart')">Podu Yeniden Başlat</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🏭 Uygulamayı Kökünden Sil</a></li>
+                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">Uygulamayı Kökünden Sil</a></li>
                     ` : '';
 
                     let statsStr = isUp ? `CPU: %${c.stats.cpu} | RAM: %${c.stats.ram_percent} <span class="opacity-75 small">(${c.stats.ram_mb} MB)</span>` : `<span class="opacity-50">-</span>`;
@@ -658,7 +658,7 @@
                                         İşlem
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-dark">
-                                        <li><a class="dropdown-item text-info fw-bold" href="#" onclick="openLogs('${c.id}', '${c.name}')">📄 Logları Gör</a></li>
+                                        <li><a class="dropdown-item text-info fw-bold" href="#" onclick="openLogs('${c.id}', '${c.name}')">Logları Gör</a></li>
                                         ${adminActions}
                                     </ul>
                                 </div>
