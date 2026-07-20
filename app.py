@@ -291,6 +291,10 @@ def manage_container(pod_name, action):
         elif action == "delete":
             if owner_name and owner_kind == "ReplicaSet":
                 apps_api.delete_namespaced_deployment(name=owner_name, namespace=namespace)
+                try:
+                    core_api.delete_namespaced_service(name=owner_name, namespace=namespace)
+                except:
+                    pass
             elif owner_name and owner_kind == "DaemonSet":
                 apps_api.delete_namespaced_daemon_set(name=owner_name, namespace=namespace)
             elif owner_name and owner_kind == "StatefulSet":
