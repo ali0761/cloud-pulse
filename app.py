@@ -239,13 +239,28 @@ def manage_container(pod_name, action):
         
         pod = core_api.read_namespaced_pod(name=pod_name, namespace=namespace)
         owner_name = None
-        if pod.metadata.owner_references and pod.metadata.owner_references[0].kind == "ReplicaSet":
-            owner_name = "-".join(pod.metadata.owner_references[0].name.split("-")[:-1])
+        owner_kind = None
+        if pod.metadata.owner_references:
+            owner_kind = pod.metadata.owner_references[0].kind
+            if owner_kind == "ReplicaSet":
+                owner_name = "-".join(pod.metadata.owner_references[0].name.split("-")[:-1])
+            else:
+                owner_name = pod.metadata.owner_references[0].name
         
-        if action == "delete" or action == "restart":
+        if action == "restart":
             core_api.delete_namespaced_pod(name=pod_name, namespace=namespace)
-            msg = "Pod silindi. (K8s otomatik yenisini açacak)" if action == "delete" else "Pod yeniden başlatılıyor..."
-            return jsonify({"status": "success", "message": msg})
+            return jsonify({"status": "success", "message": "Pod yeniden başlatılıyor..."})
+            
+        elif action == "delete":
+            if owner_name and owner_kind == "ReplicaSet":
+                apps_api.delete_namespaced_deployment(name=owner_name, namespace=namespace)
+            elif owner_name and owner_kind == "DaemonSet":
+                apps_api.delete_namespaced_daemon_set(name=owner_name, namespace=namespace)
+            elif owner_name and owner_kind == "StatefulSet":
+                apps_api.delete_namespaced_stateful_set(name=owner_name, namespace=namespace)
+            else:
+                core_api.delete_namespaced_pod(name=pod_name, namespace=namespace)
+            return jsonify({"status": "success", "message": f"{owner_name or pod_name} kökünden silindi!"})
             
         elif action == "scale":
             if not owner_name:

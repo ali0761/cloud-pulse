@@ -658,7 +658,7 @@
                         <li><a class="dropdown-item text-warning" href="#" onclick="scaleAction('${c.id}')">⚖️ Çoğalt/Azalt (Scale)</a></li>
                         <li><a class="dropdown-item text-info" href="#" onclick="manageAction('${c.id}', 'restart')">♻️ Podu Yeniden Başlat</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🗑️ Podu Sil (Yenisi Açılır)</a></li>
+                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">🏭 Uygulamayı Kökünden Sil</a></li>
                     ` : '';
 
                     // Stats string
@@ -698,7 +698,7 @@
         }
 
         async function manageAction(id, action) {
-            if (action === 'delete' && !confirm("Pod'u silmek istediğinize emin misiniz? (Kubernetes hemen yenisini başlatabilir)")) return;
+            if (action === 'delete' && !confirm("Bu uygulamayı tamamen silmek istediğinize emin misiniz? (Tüm kopyaları yok edilecek)")) return;
             try {
                 const res = await fetch(`/api/containers/${id}/${action}`, { method: 'POST' });
                 const data = await res.json();
