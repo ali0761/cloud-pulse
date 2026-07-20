@@ -136,7 +136,15 @@ def login():
             session['logged_in'] = True
             session['role'] = 'admin'
             return redirect(url_for('index'))
+        else:
+            error = 'Geçersiz kullanıcı adı veya şifre.'
     return render_template('login.html', error=error)
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    session.pop('role', None)
+    return redirect(url_for('login'))
 
 @app.route('/')
 @login_required
