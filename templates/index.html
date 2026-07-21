@@ -108,10 +108,10 @@
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card p-3 h-100 shadow-sm border-0 bg-transparent">
+                <div class="card p-3 text-center">
                     <h6 class="text-muted">RAM KULLANIMI</h6>
-                    <h2 class="display-6 fw-bold text-info" id="mem-val">%0</h2>
-                    <small class="text-muted fw-bold" id="mem-detail">0.0 GB / 0.0 GB</small>
+                    <div class="stat-value" id="mem-val">%0</div>
+                    <small class="text-muted" id="mem-detail">0 GB / 0 GB</small>
                 </div>
             </div>
             <div class="col-md-4">
@@ -577,7 +577,12 @@
                 } else {
                     const targetNode = dataNodes.nodes.find(n => n.name === currentNodeFilter);
                     cpuText = targetNode ? `%${targetNode.cpu.percent}` : `%0`;
-                    diskText = targetNode && targetNode.disk ? `%${targetNode.disk.percent}` : `%0`;
+                    
+                    let nodeDisk = targetNode && targetNode.disk ? targetNode.disk.percent : `%0`;
+                    diskText = `%${nodeDisk}`;
+                    if (typeof nodeDisk === 'string' && nodeDisk.includes('Error')) {
+                        diskText = nodeDisk; // Hata mesajını direkt ekrana bas
+                    }
                 }
 
                 document.getElementById('cpu-val').innerText = cpuText;

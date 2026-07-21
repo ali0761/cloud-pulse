@@ -234,8 +234,8 @@ def get_nodes():
                 fs_used = node_stats['node']['fs']['usedBytes']
                 fs_capacity = node_stats['node']['fs']['capacityBytes']
                 disk_percent = round((fs_used / fs_capacity) * 100, 1) if fs_capacity > 0 else 0
-            except:
-                disk_percent = 0.0
+            except Exception as e:
+                disk_percent = str(e)
             
             node_list.append({
                 "name": name,
