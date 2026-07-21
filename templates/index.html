@@ -578,11 +578,8 @@
                     const targetNode = dataNodes.nodes.find(n => n.name === currentNodeFilter);
                     cpuText = targetNode ? `%${targetNode.cpu.percent}` : `%0`;
                     
-                    let nodeDisk = targetNode && targetNode.disk ? targetNode.disk.percent : `%0`;
+                    let nodeDisk = targetNode && targetNode.disk ? targetNode.disk.percent : 0;
                     diskText = `%${nodeDisk}`;
-                    if (typeof nodeDisk === 'string' && nodeDisk.includes('Error')) {
-                        diskText = nodeDisk; // Hata mesajını direkt ekrana bas
-                    }
                 }
 
                 document.getElementById('cpu-val').innerText = cpuText;

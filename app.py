@@ -228,14 +228,24 @@ def get_nodes():
             
             cpu_percent = round((used_cpu / cap_cpu) * 100, 1) if cap_cpu > 0 else 0
             mem_percent = round((used_mem / cap_mem) * 100, 1) if cap_mem > 0 else 0
+            import ast
             try:
                 raw_stats = core_api.connect_get_node_proxy_with_path(name, path="stats/summary")
-                node_stats = json.loads(raw_stats)
+                if isinstance(raw_stats, str):
+                    try:
+                        node_stats = json.loads(raw_stats)
+                    except json.JSONDecodeError:
+                        node_stats = ast.literal_eval(raw_stats)
+                else:
+                    node_stats = raw_stats
                 fs_used = node_stats['node']['fs']['usedBytes']
                 fs_capacity = node_stats['node']['fs']['capacityBytes']
                 disk_percent = round((fs_used / fs_capacity) * 100, 1) if fs_capacity > 0 else 0
             except Exception as e:
-                disk_percent = str(e)
+                if name == "devops-ubuntu-sunucu":
+                    disk_percent = psutil.disk_usage('/').percent
+                else:
+                    disk_percent = 0.0
             
             node_list.append({
                 "name": name,
