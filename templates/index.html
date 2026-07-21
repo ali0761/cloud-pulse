@@ -151,9 +151,16 @@
             </div>
         </div>
 
-        <!-- 📉 KONTEYNER ANLIK GRAFİKLERİ -->
+        <!-- KONTEYNER ANLIK GRAFİKLERİ -->
         <h5 class="mt-4 mb-3">Konteyner Canlı Performansları</h5>
-        <div class="row g-3 mb-5" id="containerChartsGrid">
+        
+        <div class="p-2 bg-primary bg-opacity-10 text-primary fw-bold small rounded mb-3" style="letter-spacing: 1px;">Kullanıcı Uygulamaları</div>
+        <div class="row g-3 mb-4" id="containerChartsGridUser">
+            <!-- JavaScript tarafından dinamik eklenecek -->
+        </div>
+
+        <div class="p-2 bg-secondary bg-opacity-10 text-secondary fw-bold small rounded mb-3 mt-4" style="letter-spacing: 1px;">Sistem Servisleri (K3s)</div>
+        <div class="row g-3 mb-5" id="containerChartsGridSystem">
             <!-- JavaScript tarafından dinamik eklenecek -->
         </div>
 
@@ -587,7 +594,8 @@
                                 shortName = parts[0];
                             }
 
-                            const grid = document.getElementById('containerChartsGrid');
+                            const targetGridId = c.pod_type === 'user' ? 'containerChartsGridUser' : 'containerChartsGridSystem';
+                            const grid = document.getElementById(targetGridId);
                             grid.insertAdjacentHTML('beforeend', `
                                 <div class="col-md-3 col-sm-6" id="chart-card-${c.id}">
                                     <div class="card p-2 h-100 border-secondary">
@@ -641,7 +649,7 @@
                         <li><a class="dropdown-item text-warning" href="#" onclick="scaleAction('${c.id}')">Çoğalt/Azalt (Scale)</a></li>
                         <li><a class="dropdown-item text-info" href="#" onclick="manageAction('${c.id}', 'restart')">Podu Yeniden Başlat</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">Uygulamayı Kökünden Sil</a></li>
+                        <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="manageAction('${c.id}', 'delete')">Podu Sil</a></li>
                     ` : '';
 
                     let statsStr = isUp ? `CPU: %${c.stats.cpu} | RAM: %${c.stats.ram_percent} <span class="opacity-75 small">(${c.stats.ram_mb} MB)</span>` : `<span class="opacity-50">-</span>`;
