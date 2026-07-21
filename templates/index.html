@@ -53,10 +53,20 @@
                     Gündüz
                 </button>
 
-                <!-- 🔔 ALARMLAR BUTONU -->
+                <!-- BİLDİRİMLER BUTONU -->
                 <button onclick="openAlertsModal()" class="btn btn-sm btn-outline-danger fw-bold me-3 position-relative">
                     Bildirimler
                 </button>
+
+                <!-- SUNUCU SEÇİM DROPDOWN -->
+                <div class="dropdown me-3 dropdown-hover">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown" id="nodeFilterBtn">
+                        Tüm Küme
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg" id="nodeFilterMenu">
+                        <li><a class="dropdown-item fw-bold active" href="#" onclick="selectNodeFilter('all', 'Tüm Küme')">Tüm Küme</a></li>
+                    </ul>
+                </div>
 
                 <!-- 🛠️ ARAÇLAR DROPDOWN -->
                 <div class="dropdown me-3 dropdown-hover">
@@ -75,7 +85,7 @@
                 <!-- Ayarlar -->
                 <div class="dropdown me-3 admin-only d-none">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        ⚙️ Ayarlar
+                        Ayarlar
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
                         <li><a class="dropdown-item text-info" href="#" onclick="testTelegram()">Telegram Testi</a></li>
@@ -504,18 +514,75 @@
             setTimeout(() => box.classList.add('d-none'), 5000);
         }
 
+        let currentNodeFilter = 'all';
+        let currentNodeFilterName = 'Tüm Küme';
+
+        function selectNodeFilter(id, name, event) {
+            currentNodeFilter = id;
+            currentNodeFilterName = name;
+            document.getElementById('nodeFilterBtn').innerText = name;
+            
+            const links = document.querySelectorAll('#nodeFilterMenu .dropdown-item');
+            links.forEach(l => l.classList.remove('active'));
+            if(event && event.target) event.target.classList.add('active');
+
+            fetchStats();
+            fetchContainers();
+        }
+
         async function fetchStats() {
             try {
-                const res = await fetch('/api/stats');
-                if (res.redirected) { window.location.href = '/login'; return; }
-                const data = await res.json();
-                
-                document.getElementById('cpu-val').innerText = `%${data.cpu.percent}`;
-                document.getElementById('mem-val').innerText = `%${data.memory.percent}`;
-                document.getElementById('mem-detail').innerText = `${data.memory.used_gb} GB / ${data.memory.total_gb} GB`;
-                document.getElementById('disk-val').innerText = `%${data.disk.percent}`;
+                // Fetch basic stats for user role and history graph
+                const resStats = await fetch('/api/stats');
+                if (resStats.redirected) { window.location.href = '/login'; return; }
+                const dataStats = await resStats.json();
 
-                userRole = data.role;
+                // Fetch nodes for capacity
+                const resNodes = await fetch('/api/nodes');
+                const dataNodes = await resNodes.json();
+                
+                // Populate dropdown
+                const menu = document.getElementById('nodeFilterMenu');
+                let html = `<li><a class="dropdown-item fw-bold ${currentNodeFilter === 'all' ? 'active' : ''}" href="#" onclick="selectNodeFilter('all', 'Tüm Küme', event)">Tüm Küme</a></li>`;
+                dataNodes.nodes.forEach(n => {
+                    const isActive = currentNodeFilter === n.name ? 'active' : '';
+                    html += `<li><a class="dropdown-item fw-bold ${isActive}" href="#" onclick="selectNodeFilter('${n.name}', '${n.name}', event)">${n.name}</a></li>`;
+                });
+                menu.innerHTML = html;
+
+                let displayCpu = 0, displayMemUsed = 0, displayMemTotal = 0;
+
+                if (currentNodeFilter === 'all') {
+                    dataNodes.nodes.forEach(n => {
+                        displayCpu += n.cpu.used;
+                        displayMemUsed += n.memory.used_gb;
+                        displayMemTotal += n.memory.total_gb;
+                    });
+                } else {
+                    const targetNode = dataNodes.nodes.find(n => n.name === currentNodeFilter);
+                    if (targetNode) {
+                        displayCpu = targetNode.cpu.used;
+                        displayMemUsed = targetNode.memory.used_gb;
+                        displayMemTotal = targetNode.memory.total_gb;
+                    }
+                }
+
+                let memPercent = displayMemTotal > 0 ? Math.round((displayMemUsed / displayMemTotal) * 100) : 0;
+                
+                let cpuText = '';
+                if (currentNodeFilter === 'all') {
+                    cpuText = `%${dataStats.cpu.percent}`; // fallback to main server CPU for global view, or we can just leave it as %X
+                } else {
+                    const targetNode = dataNodes.nodes.find(n => n.name === currentNodeFilter);
+                    cpuText = targetNode ? `%${targetNode.cpu.percent}` : `%0`;
+                }
+
+                document.getElementById('cpu-val').innerText = cpuText;
+                document.getElementById('mem-val').innerText = `%${memPercent}`;
+                document.getElementById('mem-detail').innerText = `${displayMemUsed.toFixed(1)} GB / ${displayMemTotal.toFixed(1)} GB`;
+                document.getElementById('disk-val').innerText = `%${dataStats.disk.percent}`;
+
+                userRole = dataStats.role;
                 const roleBadge = document.getElementById('roleBadge');
                 if (userRole === 'admin') {
                     roleBadge.innerText = '🛡️ Admin';
@@ -534,8 +601,10 @@
                     sysChart.data.datasets[1].data.shift();
                 }
                 sysChart.data.labels.push(now);
-                sysChart.data.datasets[0].data.push(data.cpu.percent);
-                sysChart.data.datasets[1].data.push(data.memory.percent);
+                
+                // fallback to dataStats.cpu.percent for graph for now
+                sysChart.data.datasets[0].data.push(dataStats.cpu.percent);
+                sysChart.data.datasets[1].data.push(memPercent);
                 sysChart.update();
             } catch (e) {}
         }
@@ -559,7 +628,12 @@
 
                 const currentIds = [];
 
-                data.containers.forEach(c => {
+                let filteredContainers = data.containers;
+                if (currentNodeFilter !== 'all') {
+                    filteredContainers = data.containers.filter(c => c.node_name === currentNodeFilter);
+                }
+
+                filteredContainers.forEach(c => {
                     const isUp = c.status.toLowerCase().includes('up') || c.status.toLowerCase().includes('running');
                     
                     if (c.name === 'devops-monitor') mainContainerId = c.id;
@@ -657,7 +731,10 @@
                     return `
                         <tr>
                             <td><span class="badge ${badgeClass}">${c.status}</span></td>
-                            <td class="fw-bold small" style="color: var(--text-color);">${c.name}</td>
+                            <td class="fw-bold small" style="color: var(--text-color);">
+                                ${c.name}
+                                <span class="badge bg-secondary text-light ms-1 opacity-75 fw-normal" style="font-size: 0.65rem;">[${c.node_name}]</span>
+                            </td>
                             <td class="small opacity-75">${c.image}</td>
                             <td style="font-size: 0.85rem;">${statsStr}</td>
                             <td>

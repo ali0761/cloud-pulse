@@ -181,6 +181,72 @@ def logout():
 def index():
     return render_template('index.html', role=session.get('role', 'viewer'))
 
+def parse_k8s_cpu(cpu_str):
+    try:
+        if cpu_str.endswith('m'):
+            return int(cpu_str[:-1]) / 1000.0
+        elif cpu_str.endswith('n'):
+            return int(cpu_str[:-1]) / 1000000000.0
+        return float(cpu_str)
+    except: return 0.0
+
+def parse_k8s_memory(mem_str):
+    try:
+        if mem_str.endswith('Ki'):
+            return int(mem_str[:-2]) * 1024
+        elif mem_str.endswith('Mi'):
+            return int(mem_str[:-2]) * 1024 * 1024
+        elif mem_str.endswith('Gi'):
+            return int(mem_str[:-2]) * 1024 * 1024 * 1024
+        return int(mem_str)
+    except: return 0
+
+@app.route('/api/nodes')
+@login_required
+def get_nodes():
+    try:
+        core_api, _, custom_api = get_k8s_client()
+        nodes = core_api.list_node().items
+        try:
+            metrics = custom_api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes").get('items', [])
+            metrics_dict = {m['metadata']['name']: m['usage'] for m in metrics}
+        except:
+            metrics_dict = {}
+
+        node_list = []
+        for n in nodes:
+            name = n.metadata.name
+            capacity = n.status.capacity
+            allocatable = n.status.allocatable
+            
+            cap_cpu = parse_k8s_cpu(capacity.get('cpu', '1'))
+            cap_mem = parse_k8s_memory(capacity.get('memory', '0Ki'))
+            
+            usage = metrics_dict.get(name, {})
+            used_cpu = parse_k8s_cpu(usage.get('cpu', '0n'))
+            used_mem = parse_k8s_memory(usage.get('memory', '0Ki'))
+            
+            cpu_percent = round((used_cpu / cap_cpu) * 100, 1) if cap_cpu > 0 else 0
+            mem_percent = round((used_mem / cap_mem) * 100, 1) if cap_mem > 0 else 0
+            
+            node_list.append({
+                "name": name,
+                "cpu": {
+                    "used": used_cpu,
+                    "total": cap_cpu,
+                    "percent": cpu_percent
+                },
+                "memory": {
+                    "used_gb": round(used_mem / (1024**3), 2),
+                    "total_gb": round(cap_mem / (1024**3), 2),
+                    "percent": mem_percent
+                }
+            })
+            
+        return jsonify({"nodes": node_list})
+    except Exception as e:
+        return jsonify({"error": str(e), "nodes": []})
+
 @app.route('/api/stats')
 @login_required
 def get_stats():
@@ -250,6 +316,7 @@ def get_containers():
                 "name": name,
                 "status": status,
                 "image": image,
+                "node_name": pod.spec.node_name or "Bilinmiyor",
                 "stats": c_stats,
                 "pod_type": "system" if is_system else "user"
             })
