@@ -507,6 +507,7 @@ def set_limit(pod_name):
             "spec": {
                 "template": {
                     "spec": {
+                        "enable_service_links": False,
                         "containers": [{
                             "name": container_name,
                             "resources": {

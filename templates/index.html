@@ -579,7 +579,11 @@
                     cpuText = targetNode ? `%${targetNode.cpu.percent}` : `%0`;
                     
                     let nodeDisk = targetNode && targetNode.disk ? targetNode.disk.percent : 0;
-                    diskText = `%${nodeDisk}`;
+                    if (nodeDisk === 0 || nodeDisk === 0.0) {
+                        diskText = `%${dataStats.disk.percent}`;
+                    } else {
+                        diskText = `%${nodeDisk}`;
+                    }
                 }
 
                 document.getElementById('cpu-val').innerText = cpuText;
