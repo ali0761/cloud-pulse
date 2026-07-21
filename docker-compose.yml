@@ -60,6 +60,16 @@ services:
       - LETSENCRYPT_HOST=mario-ali.duckdns.org
     restart: always
 
+  # 5. KUBERNETES KÖPRÜSÜ (DOOM İÇİN)
+  doom-proxy:
+    image: alpine/socat
+    container_name: doom-proxy
+    command: tcp-listen:80,fork,reuseaddr tcp-connect:10.0.0.66:3001
+    environment:
+      - VIRTUAL_HOST=doom-ali.duckdns.org
+      - LETSENCRYPT_HOST=doom-ali.duckdns.org
+    restart: always
+
 volumes:
   conf:
   vhost:
