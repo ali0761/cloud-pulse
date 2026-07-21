@@ -212,7 +212,7 @@ def get_nodes():
             metrics_dict = {m['metadata']['name']: m['usage'] for m in metrics}
         except:
             metrics_dict = {}
-
+        import json
         node_list = []
         for n in nodes:
             name = n.metadata.name
@@ -228,6 +228,14 @@ def get_nodes():
             
             cpu_percent = round((used_cpu / cap_cpu) * 100, 1) if cap_cpu > 0 else 0
             mem_percent = round((used_mem / cap_mem) * 100, 1) if cap_mem > 0 else 0
+            try:
+                raw_stats = core_api.connect_get_node_proxy_with_path(name, path="stats/summary")
+                node_stats = json.loads(raw_stats)
+                fs_used = node_stats['node']['fs']['usedBytes']
+                fs_capacity = node_stats['node']['fs']['capacityBytes']
+                disk_percent = round((fs_used / fs_capacity) * 100, 1) if fs_capacity > 0 else 0
+            except:
+                disk_percent = 0.0
             
             node_list.append({
                 "name": name,
@@ -240,6 +248,9 @@ def get_nodes():
                     "used_gb": round(used_mem / (1024**3), 2),
                     "total_gb": round(cap_mem / (1024**3), 2),
                     "percent": mem_percent
+                },
+                "disk": {
+                    "percent": disk_percent
                 }
             })
             

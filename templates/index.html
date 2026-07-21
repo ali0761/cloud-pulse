@@ -108,10 +108,10 @@
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card p-3 text-center">
-                    <h6 class="text-muted">RAM KULLANIMI (12 GB)</h6>
-                    <div class="stat-value" id="mem-val">%0</div>
-                    <small class="text-muted" id="mem-detail">0 GB / 0 GB</small>
+                <div class="card p-3 h-100 shadow-sm border-0 bg-transparent">
+                    <h6 class="text-muted">RAM KULLANIMI</h6>
+                    <h2 class="display-6 fw-bold text-info" id="mem-val">%0</h2>
+                    <small class="text-muted fw-bold" id="mem-detail">0.0 GB / 0.0 GB</small>
                 </div>
             </div>
             <div class="col-md-4">
@@ -570,17 +570,20 @@
                 let memPercent = displayMemTotal > 0 ? Math.round((displayMemUsed / displayMemTotal) * 100) : 0;
                 
                 let cpuText = '';
+                let diskText = '';
                 if (currentNodeFilter === 'all') {
-                    cpuText = `%${dataStats.cpu.percent}`; // fallback to main server CPU for global view, or we can just leave it as %X
+                    cpuText = `%${dataStats.cpu.percent}`;
+                    diskText = `%${dataStats.disk.percent}`;
                 } else {
                     const targetNode = dataNodes.nodes.find(n => n.name === currentNodeFilter);
                     cpuText = targetNode ? `%${targetNode.cpu.percent}` : `%0`;
+                    diskText = targetNode && targetNode.disk ? `%${targetNode.disk.percent}` : `%0`;
                 }
 
                 document.getElementById('cpu-val').innerText = cpuText;
                 document.getElementById('mem-val').innerText = `%${memPercent}`;
                 document.getElementById('mem-detail').innerText = `${displayMemUsed.toFixed(1)} GB / ${displayMemTotal.toFixed(1)} GB`;
-                document.getElementById('disk-val').innerText = `%${dataStats.disk.percent}`;
+                document.getElementById('disk-val').innerText = diskText;
 
                 userRole = dataStats.role;
                 const roleBadge = document.getElementById('roleBadge');
