@@ -544,6 +544,20 @@ def deploy_container():
 
         core_api, apps_api, _ = get_k8s_client()
         
+        # Port parse
+        port_mapping = data.get('port', '').strip()
+        external_port, internal_port = None, None
+        if port_mapping:
+            if ':' in port_mapping:
+                external_port, internal_port = port_mapping.split(':', 1)
+            else:
+                external_port, internal_port = port_mapping, port_mapping
+                
+        # Container portları hazırla
+        container_ports = []
+        if internal_port:
+            container_ports.append(client.V1ContainerPort(container_port=int(internal_port)))
+
         deployment = client.V1Deployment(
             metadata=client.V1ObjectMeta(name=name),
             spec=client.V1DeploymentSpec(
@@ -551,16 +565,14 @@ def deploy_container():
                 selector=client.V1LabelSelector(match_labels={"app": name}),
                 template=client.V1PodTemplateSpec(
                     metadata=client.V1ObjectMeta(labels={"app": name}),
-                    spec=client.V1PodSpec(containers=[client.V1Container(name=name, image=image)])
+                    spec=client.V1PodSpec(containers=[client.V1Container(name=name, image=image, ports=container_ports if container_ports else None)])
                 )
             )
         )
         apps_api.create_namespaced_deployment(namespace="default", body=deployment)
         
-        # Eğer port yönlendirmesi istenmişse K8s Service (LoadBalancer) oluştur
-        port_mapping = data.get('port', '').strip()
-        if port_mapping and ':' in port_mapping:
-            external_port, internal_port = port_mapping.split(':', 1)
+        # Eğer port yönlendirmesi istenmişse K8s Service oluştur
+        if external_port and internal_port:
             service = client.V1Service(
                 metadata=client.V1ObjectMeta(name=name),
                 spec=client.V1ServiceSpec(
