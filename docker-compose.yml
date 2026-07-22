@@ -54,10 +54,13 @@ services:
   k8s-proxy:
     image: alpine/socat
     container_name: k8s-proxy
-    command: tcp-listen:80,fork,reuseaddr tcp-connect:10.0.0.66:8090
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: tcp-listen:80,fork,reuseaddr tcp-connect:host.docker.internal:8080
     environment:
       - VIRTUAL_HOST=mario-ali.duckdns.org
       - LETSENCRYPT_HOST=mario-ali.duckdns.org
+      - LETSENCRYPT_EMAIL=admin@duckdns.org
     restart: always
 
   # 5. KUBERNETES KÖPRÜSÜ (DOOM İÇİN)
