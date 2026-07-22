@@ -565,7 +565,10 @@ def deploy_container():
                 selector=client.V1LabelSelector(match_labels={"app": name}),
                 template=client.V1PodTemplateSpec(
                     metadata=client.V1ObjectMeta(labels={"app": name}),
-                    spec=client.V1PodSpec(containers=[client.V1Container(name=name, image=image, ports=container_ports if container_ports else None)])
+                    spec=client.V1PodSpec(
+                        enable_service_links=False,
+                        containers=[client.V1Container(name=name, image=image, ports=container_ports if container_ports else None)]
+                    )
                 )
             )
         )
